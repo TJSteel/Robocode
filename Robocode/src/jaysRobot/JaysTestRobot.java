@@ -15,9 +15,9 @@ public class JaysTestRobot extends AdvancedRobot {
 	private static double MAX_FIRE_POWER = 1; // max power multiplier, should be in the range 0-1
 	private static int WALL_MARGIN = 100;
 	private boolean wallAvoidance = false;
-	private boolean isScanning = false;
 	private ScannedRobotEvent closestEnemy = null;
-	
+	private long lastScanned = 0;
+       	
 	// this is to track the direction of the robot, this is so we can drive backwards 
 	// if the shortest rotation to our bearing would be to reverse instead
 	private int robotDirection = 1;
@@ -31,9 +31,9 @@ public class JaysTestRobot extends AdvancedRobot {
 		setAdjustRadarForGunTurn(true);
 		
 		// setting colours for my robot
-        setBodyColor(new Color(0,255,0));
-        setGunColor(new Color(0,200,0));
-        setRadarColor(new Color(0,100,0));
+        setBodyColor(new Color(255,20,147));
+        setGunColor(new Color(235,0,127));
+        setRadarColor(new Color(215,0,107));
         setScanColor(Color.PINK);
         setBulletColor(Color.PINK);
         
@@ -55,6 +55,7 @@ public class JaysTestRobot extends AdvancedRobot {
 	 * Most of our code will be here, this event is triggered when we spot another robot
 	 */
 	public void onScannedRobot(ScannedRobotEvent e) {
+		lastScanned = System.currentTimeMillis();
 		if (closestEnemy == null) {
 			closestEnemy = e;
 		}
@@ -254,7 +255,7 @@ public class JaysTestRobot extends AdvancedRobot {
     	setTurnGunRightRadians(Utils.normalRelativeAngle(theta - getGunHeadingRadians()));
     	
     	// shoot to kill if the gun is aimed and not too hot
-    	if (getGunHeat() == 0 && Math.abs(getGunTurnRemaining()) < 5) {
+    	if (getGunHeat() == 0 && Math.abs(getGunTurnRemaining()) < 10) {
     		setFire(firePower);
     		setScanning();
     	}

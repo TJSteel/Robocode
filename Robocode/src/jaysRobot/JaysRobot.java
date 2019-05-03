@@ -5,6 +5,7 @@ import java.awt.geom.Point2D;
 import robocode.AdvancedRobot;
 import robocode.Condition;
 import robocode.CustomEvent;
+import robocode.HitByBulletEvent;
 import robocode.HitWallEvent;
 import robocode.ScannedRobotEvent;
 import robocode.WinEvent;
@@ -28,11 +29,11 @@ public class JaysRobot extends AdvancedRobot {
 		setAdjustRadarForGunTurn(true);
 		
 		// setting colours for my robot
-        setBodyColor(new Color(255,20,147));
-        setGunColor(new Color(235,0,127));
-        setRadarColor(new Color(215,0,107));
-        setScanColor(Color.PINK);
-        setBulletColor(Color.PINK);
+        setBodyColor(new Color(0,255,0));
+        setGunColor(new Color(0,200,0));
+        setRadarColor(new Color(0,100,0));
+        setScanColor(Color.GREEN);
+        setBulletColor(Color.GREEN);
         
         addCustomEvents();
         
@@ -43,6 +44,17 @@ public class JaysRobot extends AdvancedRobot {
         }
 	}
 
+	
+	
+@Override
+public void onHitByBullet(HitByBulletEvent event) {
+	// TODO Auto-generated method stub
+	super.onHitByBullet(event);
+	//setAllColors(Color.red);
+	
+}
+	
+	
 	/**
 	 * Most of our code will be here, this event is triggered when we spot another robot
 	 */

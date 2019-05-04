@@ -1,11 +1,14 @@
-package jaysRobot;
+package jaysTestRobot;
 import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 
+import jaysRobot.EnemyBot;
 import robocode.AdvancedRobot;
 import robocode.Condition;
 import robocode.CustomEvent;
-import robocode.HitWallEvent;
+import robocode.HitByBulletEvent;
+import robocode.HitRobotEvent;
 import robocode.RobotDeathEvent;
 import robocode.ScannedRobotEvent;
 import robocode.WinEvent;
@@ -15,14 +18,16 @@ public class JaysTestRobot extends AdvancedRobot {
 	private static double MAX_FIRE_POWER = 1; // max power multiplier, should be in the range 0-1
 	private static int WALL_MARGIN = 100;
 	private boolean wallAvoidance = false;
-	private ScannedRobotEvent closestEnemy = null;
-	private long lastScanned = 0;
-       	
+	private double enemyProximity = 200; //how close to enemy should we get
+	private byte scanDirection = 1;
+	
 	// this is to track the direction of the robot, this is so we can drive backwards 
 	// if the shortest rotation to our bearing would be to reverse instead
 	private int robotDirection = 1;
 	// this is to track the direction of travel, forwards or backwards
 	private int travelDirection = 1;
+	
+	private EnemyBot enemy = new EnemyBot();
 	
 	public void run() {
 		// setting radar / gun to be able to turn independently of each other
@@ -31,54 +36,67 @@ public class JaysTestRobot extends AdvancedRobot {
 		setAdjustRadarForGunTurn(true);
 		
 		// setting colours for my robot
-        setBodyColor(new Color(255,20,147));
-        setGunColor(new Color(235,0,127));
-        setRadarColor(new Color(215,0,107));
-        setScanColor(Color.PINK);
-        setBulletColor(Color.PINK);
+        setBodyColor(new Color(148,0,211)); // darkViolet
+        setGunColor(new Color(139,0,139)); // darkMagenta
+        setRadarColor(new Color(75,0,130)); // indigo
+        setScanColor(new Color(148,0,211));
+        setBulletColor(new Color(148,0,211));
         
         addCustomEvents();
-        
-        setScanning();
-        
+        enemy.reset();
         while (true) {
-            // Initialise radar to permanently scan
-        	if ( getRadarTurnRemaining() <= 0.0 ) {
-        		isScanning = false;
-        		setTurnRadarRightRadians(Double.POSITIVE_INFINITY);//keep turning radar right
-        	}
-            execute();
+        	doScan();
+        	doMove();
+        	doShoot();
+        	execute();
         }
 	}
 
+	@Override
+	public void onPaint(Graphics2D g) {
+		if (!enemy.none()) {
+		    
+		    // Set the paint color to a red half transparent color
+		    g.setColor(new Color(0xff, 0x00, 0x00, 0x80));
+		 
+		    // Draw a line from our robot to the scanned robot
+		    g.drawLine((int)getX(), (int)getY(), enemy.getX(), enemy.getY());
+		 
+		    // Draw a filled square on top of the scanned robot that covers it
+		    g.fillRect( enemy.getX() - 20,  enemy.getY() - 20, 40, 40);
+		}
+	}
+	@Override
+	public void onHitByBullet(HitByBulletEvent event) {
+		super.onHitByBullet(event);
+		//setAllColors(Color.red);
+	}
+	
 	/**
 	 * Most of our code will be here, this event is triggered when we spot another robot
 	 */
 	public void onScannedRobot(ScannedRobotEvent e) {
-		lastScanned = System.currentTimeMillis();
-		if (closestEnemy == null) {
-			closestEnemy = e;
+		// we don't want to attack the sentry
+		if (e.isSentryRobot()) {
+			return;
 		}
 		
-		// if we've scanned the enemy, update it's details
-		if (e.getName().equals(closestEnemy.getName())) {
-			closestEnemy = e;
+		/* update enemy if it doesn't exist
+		 * if it is closer
+		 * if it is our current target
+		 */
+		if (
+		enemy.none() ||
+		e.getDistance() < enemy.getDistance() - 50 ||
+		e.getName().equals(enemy.getName())) {
+			enemy.update(e, (AdvancedRobot)this);
 		}
 		
-		if (e.getDistance() < closestEnemy.getDistance()) {
-			closestEnemy = e;
+		// if there is only 1 enemy left, lock on target
+		if (getOthers() == 1) {
+			scanDirection *= -1;
 		}
-    	
-    	// check that the robot you think is closest hasn't died, if it has, start attacking the newly scanned robot
-//    	if (closestEnemy.getEnergy() <= 0) {
- //   		closestEnemy = e;
-  //  	}
-    	
-    	if (e.getName().equals(closestEnemy.getName())) {
-    		radarLock(e);
-    		shoot(e);
-    		move(e);
-    	}
+		
     }
 
 	/**
@@ -101,14 +119,6 @@ public class JaysTestRobot extends AdvancedRobot {
 				doTurnRightRadians(heading);
 				setAhead(100 * travelDirection * robotDirection);
 			}
-		}
-	}
-
-	private void setScanning() {
-		if (isScanning == false) {
-			isScanning = true;
-			setTurnRadarRight(360);
-			closestEnemy = null;
 		}
 	}
 
@@ -139,9 +149,6 @@ public class JaysTestRobot extends AdvancedRobot {
 		doTurnRightRadians(Math.toRadians(heading));
 	}
 	
-	
-	
-
 	/**
 	 * Handles the creation of our custom events, such as detecting wall proximity
 	 */
@@ -160,37 +167,18 @@ public class JaysTestRobot extends AdvancedRobot {
 				getY() >= getBattleFieldHeight() - WALL_MARGIN));
 			}
 		});
-		
-		addCustomEvent(new Condition("Gun cooldown higher than scan time") {
-			@Override
-			public boolean test() {
-				// heat == 1 + firepower / 5 
-				
-				// default cooling time setting == 0.1, max is 0.7
-				// max firePower gives cooling time of 1 + 3 / 5 == 1.6 / 0.1 == 16 ticks
-				// min firePower gives cooling time of 1 + 1 / 5 == 1.2 / 0.1 == 12 ticks
-
-				// any cooling time greater than 0.2 will cause this to never trigger
-				
-				double heat = getGunHeat();
-				double coolingRate = getGunCoolingRate();
-				double coolingTime = heat / coolingRate;
-				
-				// radar rotation = 45 degs per turn, 360 / 45 = 8 ticks per full rotation
-				double radarRotationTime = 8;
-				
-				return (coolingTime > radarRotationTime);
-			}
-		});
-		
 	}
     
+
+	private void doScan() {
+		setTurnRadarRight(360*scanDirection);
+	}
+	
     /**
      * Moves the robot depending where the enemy is.
      * If the robot is far away, it will advance at a 20 degree angle, if we're close enough it will circle the enemy.
-     * @param e the scanned robot event
      */
-	private void move(ScannedRobotEvent e) {
+	private void doMove() {
 		// allow wall avoidance movements to complete
 		if (wallAvoidance == true) {
     		if (getDistanceRemaining() <= 5 && getDistanceRemaining() >= -5) {
@@ -198,36 +186,40 @@ public class JaysTestRobot extends AdvancedRobot {
     		}
     	} else {
 			
-			double enemyProximity = 100; //how close to enemy should we get
-			
 			//approach enemy if we're too far away
-			double approachAngle = e.getDistance() > enemyProximity ? (20 * travelDirection) : 0;
+			double approachAngle = enemy.getDistance() > enemyProximity ? (20 * travelDirection) : 0;
 			
-			doTurnRightDegrees(e.getBearing() + 90 - approachAngle);
+			doTurnRightDegrees(enemy.getBearing() + 90 - approachAngle);
 	    	
 	    	
-	    	if (Math.random() > 0.95) {
+	    	if (Math.random() > 0.90) {
 	    		travelDirection *= -1;
 	    	} 
 	    	setAhead(100 * travelDirection);
     	}
 	}
 	
+	public void onHitRobot(HitRobotEvent e) {
+		travelDirection *= -1;
+	}
+	
 	/**
 	 * Adjusts the gun and shoots at the enemy.
 	 * If the enemy is travelling, it will shoot ahead at the location the enemy will be, should they continue to drive at the same speed and heading. 
-	 * @param e the scanned robot event of the enemy to shoot at
 	 */
-	private void shoot(ScannedRobotEvent e) {
-    	double firePower = getFirePower(e.getDistance());
+	private void doShoot() {
+		if (enemy.none()) {
+			// nothing to fire at, therefore return
+			return;
+		}
+    	double firePower = getFirePower(enemy.getDistance());
     	// aim gun at the enemy
     	double myX = getX();
     	double myY = getY();
-    	double absoluteBearing = getHeadingRadians() + e.getBearingRadians();
-    	double enemyX = getX() + e.getDistance() * Math.sin(absoluteBearing);
-    	double enemyY = getY() + e.getDistance() * Math.cos(absoluteBearing);
-    	double enemyHeading = e.getHeadingRadians();
-    	double enemyVelocity = e.getVelocity();
+    	double enemyX = enemy.getX();
+    	double enemyY = enemy.getY();
+    	double enemyHeading = enemy.getHeadingRadians();
+    	double enemyVelocity = enemy.getVelocity();
     	 
     	 
     	double deltaTime = 0;
@@ -257,18 +249,23 @@ public class JaysTestRobot extends AdvancedRobot {
     	// shoot to kill if the gun is aimed and not too hot
     	if (getGunHeat() == 0 && Math.abs(getGunTurnRemaining()) < 10) {
     		setFire(firePower);
-    		setScanning();
     	}
 	}
 
-	
+	@Override
+	public void onRobotDeath(RobotDeathEvent e) {
+		// check if the enemy we were tracking died
+		if (e.getName().equals(enemy.getName())) {
+			enemy.reset();
+		}
+	}   
 	/**
 	 * Stops the radar spinning once a target is found, and locks onto the target
 	 * @param e The robot to lock onto
 	 */
-	private void radarLock(ScannedRobotEvent e) {
+	private void radarLock() {
 		// basic 1v1 radar creating a permanent lock
-    	setTurnRadarRight(2.0 * Utils.normalRelativeAngleDegrees(getHeading() - getRadarHeading() + e.getBearing()));
+    	setTurnRadarRight(2.0 * Utils.normalRelativeAngleDegrees(getHeading() - getRadarHeading() + enemy.getBearing()));
 	}
 	
     /**
@@ -345,7 +342,7 @@ public class JaysTestRobot extends AdvancedRobot {
 		if (theta > Math.PI) {
 			theta -= Math.PI * 2;
 		}
-
+		
 		return theta;
 	}
 

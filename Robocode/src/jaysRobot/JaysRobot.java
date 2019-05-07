@@ -26,7 +26,7 @@ public class JaysRobot extends AdvancedRobot {
 	// this is to track the direction of travel, forwards or backwards
 	private int travelDirection = 1;
 	
-	private EnemyBot enemy = new EnemyBot();
+	private EnemyHandler enemyHandler = new EnemyHandler();
 	
 	public void run() {
 		// setting radar / gun to be able to turn independently of each other
@@ -42,18 +42,18 @@ public class JaysRobot extends AdvancedRobot {
         setBulletColor(Color.GREEN);
         
         addCustomEvents();
-        enemy.reset();
         while (true) {
         	doScan();
         	doMove();
         	doShoot();
         	execute();
+        	System.out.println("enemy health: " + this.enemyHandler.getEnemy().getEnergy());
         }
 	}
-
 	@Override
 	public void onPaint(Graphics2D g) {
-		if (!enemy.none()) {
+		EnemyBot enemy = enemyHandler.getEnemy();
+		if (!enemy.isIdle(getTime())) {
 		    
 		    // Set the paint color to a red half transparent color
 		    g.setColor(new Color(0xff, 0x00, 0x00, 0x80));
@@ -75,27 +75,17 @@ public class JaysRobot extends AdvancedRobot {
 	 * Most of our code will be here, this event is triggered when we spot another robot
 	 */
 	public void onScannedRobot(ScannedRobotEvent e) {
-		// we don't want to attack the sentry
+		// we don't want to attack sentries
 		if (e.isSentryRobot()) {
 			return;
 		}
 		
-		/* update enemy if it doesn't exist
-		 * if it is closer
-		 * if it is our current target
-		 */
-		if (
-		enemy.none() ||
-		e.getDistance() < enemy.getDistance() - 50 ||
-		e.getName().equals(enemy.getName())) {
-			enemy.update(e, (AdvancedRobot)this);
-		}
+		enemyHandler.update(e, this, getTime());
 		
 		// if there is only 1 enemy left, lock on target
 		if (getOthers() == 1) {
 			scanDirection *= -1;
 		}
-		
     }
 
 	/**
@@ -178,6 +168,7 @@ public class JaysRobot extends AdvancedRobot {
      * If the robot is far away, it will advance at a 20 degree angle, if we're close enough it will circle the enemy.
      */
 	private void doMove() {
+		EnemyBot enemy = enemyHandler.getEnemy();
 		// allow wall avoidance movements to complete
 		if (wallAvoidance == true) {
     		if (getDistanceRemaining() <= 5 && getDistanceRemaining() >= -5) {
@@ -207,7 +198,8 @@ public class JaysRobot extends AdvancedRobot {
 	 * If the enemy is travelling, it will shoot ahead at the location the enemy will be, should they continue to drive at the same speed and heading. 
 	 */
 	private void doShoot() {
-		if (enemy.none()) {
+		EnemyBot enemy = enemyHandler.getEnemy();
+		if (enemy.isIdle(getTime())) {
 			// nothing to fire at, therefore return
 			return;
 		}
@@ -253,19 +245,9 @@ public class JaysRobot extends AdvancedRobot {
 
 	@Override
 	public void onRobotDeath(RobotDeathEvent e) {
-		// check if the enemy we were tracking died
-		if (e.getName().equals(enemy.getName())) {
-			enemy.reset();
-		}
+		enemyHandler.death(e);
 	}   
-	/**
-	 * Stops the radar spinning once a target is found, and locks onto the target
-	 * @param e The robot to lock onto
-	 */
-	private void radarLock() {
-		// basic 1v1 radar creating a permanent lock
-    	setTurnRadarRight(2.0 * Utils.normalRelativeAngleDegrees(getHeading() - getRadarHeading() + enemy.getBearing()));
-	}
+
 	
     /**
      * Do a victory dance
@@ -294,7 +276,8 @@ public class JaysRobot extends AdvancedRobot {
      * @param speed: speed of object
      * @return double: time
      */
-    private static double getTravelTime(double distance, double speed) {
+    @SuppressWarnings("unused")
+	private static double getTravelTime(double distance, double speed) {
     	return distance / speed;
     }
     
@@ -303,7 +286,8 @@ public class JaysRobot extends AdvancedRobot {
      * @param power: power you're applying to the bullet
      * @return double: speed of the bullet
      */
-    private static double getBulletSpeed(double firePower) {
+    @SuppressWarnings("unused")
+	private static double getBulletSpeed(double firePower) {
     	return 20 - firePower * 3;
     }
 

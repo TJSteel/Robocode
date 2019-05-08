@@ -59,6 +59,9 @@ public class EnemyBot {
 	public double getEnergy() {
 		return energy;
 	}
+	public double getPreviousHeadingRadians() {
+		return previousHeadingRadians;
+	}
 	public double getHeadingRadians() {
 		return headingRadians;
 	}
@@ -73,6 +76,9 @@ public class EnemyBot {
 	}
 	public int getY() {
 		return Y;
+	}
+	public double getTurnRate() {
+		return this.turnRate;
 	}
 	/**
 	 * Returns true if the last scan time exceeds the idle limit 

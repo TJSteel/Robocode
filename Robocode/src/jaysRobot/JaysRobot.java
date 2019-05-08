@@ -203,43 +203,43 @@ public class JaysRobot extends AdvancedRobot {
 			// nothing to fire at, therefore return
 			return;
 		}
-    	double firePower = getFirePower(enemy.getDistance());
     	// aim gun at the enemy
     	double myX = getX();
     	double myY = getY();
+    	double distance = enemy.getDistance();
+    	double firePower = getFirePower(distance);
+    	double bulletSpeed = Game.getBulletSpeed(firePower);
     	double enemyX = enemy.getX();
     	double enemyY = enemy.getY();
     	double enemyHeading = enemy.getHeadingRadians();
+    	double oldEnemyHeading = enemy.getPreviousHeadingRadians();
+    	double enemyHeadingChange = enemyHeading - oldEnemyHeading;
     	double enemyVelocity = enemy.getVelocity();
-    	double wallProximity = 2;
-    	 
-    	 
+
     	double deltaTime = 0;
     	double battleFieldHeight = getBattleFieldHeight(), 
     	       battleFieldWidth = getBattleFieldWidth();
     	double predictedX = enemyX, predictedY = enemyY;
-    	while((++deltaTime) * getBulletSpeed(firePower) < 
-    	      Point2D.Double.distance(myX, myY, predictedX, predictedY)){		
-    		predictedX += Math.sin(enemyHeading) * enemyVelocity;	
+    	while((++deltaTime) * bulletSpeed < Point2D.Double.distance(myX, myY, predictedX, predictedY)){		
+    		predictedX += Math.sin(enemyHeading) * enemyVelocity;
     		predictedY += Math.cos(enemyHeading) * enemyVelocity;
-    		if(	predictedX < wallProximity 
-    			|| predictedY < wallProximity
-    			|| predictedX > battleFieldWidth - wallProximity
-    			|| predictedY > battleFieldHeight - wallProximity){
-    			predictedX = Math.min(Math.max(wallProximity, predictedX), 
-    	                    battleFieldWidth - wallProximity);	
-    			predictedY = Math.min(Math.max(wallProximity, predictedY), 
-    	                    battleFieldHeight - wallProximity);
+    		enemyHeading += enemyHeadingChange;
+    		if(	predictedX < 0
+    			|| predictedY < 0
+    			|| predictedX > battleFieldWidth
+    			|| predictedY > battleFieldHeight){
+    	 
+    			predictedX = Math.min(Math.max(0, predictedX), battleFieldWidth);	
+    			predictedY = Math.min(Math.max(0, predictedY), battleFieldHeight);
     			break;
     		}
     	}
-    	double theta = Utils.normalAbsoluteAngle(Math.atan2(
-    	    predictedX - getX(), predictedY - getY()));
+    	double theta = Utils.normalAbsoluteAngle(Math.atan2(predictedX - getX(), predictedY - getY()));
     	 
     	setTurnGunRightRadians(Utils.normalRelativeAngle(theta - getGunHeadingRadians()));
     	
     	// shoot to kill if the gun is aimed and not too hot
-    	if (getGunHeat() <= firePower && Math.abs(getGunTurnRemaining()) < 1) {
+    	if (getGunHeat() <= firePower && Math.abs(getGunTurnRemaining()) < 10) {
     		setFire(firePower);
     	}
 	}
@@ -280,26 +280,6 @@ public class JaysRobot extends AdvancedRobot {
     	
     	// should prevent running out of power
     	return power * multiplier;
-    }
-
-    /**
-     * Returns the time taken to travel a specified distance given the objects speed
-     * @param distance: distance to target
-     * @param speed: speed of object
-     * @return double: time
-     */
-    @SuppressWarnings("unused")
-	private static double getTravelTime(double distance, double speed) {
-    	return distance / speed;
-    }
-    
-    /**
-     * Returns bullet speed based on the game logic of speed = 20 - firePower * 3
-     * @param power: power you're applying to the bullet
-     * @return double: speed of the bullet
-     */
-	private static double getBulletSpeed(double firePower) {
-    	return 20 - firePower * 3;
     }
 
 	/**

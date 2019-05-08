@@ -9,7 +9,7 @@ import robocode.ScannedRobotEvent;
 public class EnemyHandler {
 	private static ArrayList<EnemyBot> enemies = new ArrayList<EnemyBot>();
 	private static EnemyBot currentTarget;
-	private double changeTargetMargin = 50; // when changing to closer target, only swap if the distance closer is greater than this
+	private double changeTargetMargin = 50; // when changing to closer target, only swap if the distance closer is less than this
 	
 	public void update(ScannedRobotEvent e, AdvancedRobot r, long gameTime) {
 		boolean enemyFound = false;

@@ -4,6 +4,7 @@ import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 
 import jaysRobot.EnemyBot;
+import jaysRobot.EnemyHandler;
 import robocode.AdvancedRobot;
 import robocode.Condition;
 import robocode.CustomEvent;
@@ -20,20 +21,20 @@ public class JaysTestRobot extends AdvancedRobot {
 	private boolean wallAvoidance = false;
 	private double enemyProximity = 200; //how close to enemy should we get
 	private byte scanDirection = 1;
-	
 	// this is to track the direction of the robot, this is so we can drive backwards 
 	// if the shortest rotation to our bearing would be to reverse instead
 	private int robotDirection = 1;
 	// this is to track the direction of travel, forwards or backwards
 	private int travelDirection = 1;
 	
-	private EnemyBot enemy = new EnemyBot();
+	private EnemyHandler enemyHandler = new EnemyHandler();
 	
 	public void run() {
 		// setting radar / gun to be able to turn independently of each other
 		// wiki states this is essential
 		setAdjustGunForRobotTurn(true);
 		setAdjustRadarForGunTurn(true);
+		setAdjustRadarForRobotTurn(true);
 		
 		// setting colours for my robot
         setBodyColor(new Color(148,0,211)); // darkViolet
@@ -43,18 +44,18 @@ public class JaysTestRobot extends AdvancedRobot {
         setBulletColor(new Color(148,0,211));
         
         addCustomEvents();
-        enemy.reset();
         while (true) {
         	doScan();
         	doMove();
         	doShoot();
         	execute();
+        	//System.out.println(this.enemyHandler.getEnemy().toString());
         }
 	}
-
 	@Override
 	public void onPaint(Graphics2D g) {
-		if (!enemy.none()) {
+		EnemyBot enemy = enemyHandler.getEnemy();
+		if (!enemy.isIdle(getTime())) {
 		    
 		    // Set the paint color to a red half transparent color
 		    g.setColor(new Color(0xff, 0x00, 0x00, 0x80));
@@ -76,27 +77,17 @@ public class JaysTestRobot extends AdvancedRobot {
 	 * Most of our code will be here, this event is triggered when we spot another robot
 	 */
 	public void onScannedRobot(ScannedRobotEvent e) {
-		// we don't want to attack the sentry
+		// we don't want to attack sentries
 		if (e.isSentryRobot()) {
 			return;
 		}
 		
-		/* update enemy if it doesn't exist
-		 * if it is closer
-		 * if it is our current target
-		 */
-		if (
-		enemy.none() ||
-		e.getDistance() < enemy.getDistance() - 50 ||
-		e.getName().equals(enemy.getName())) {
-			enemy.update(e, (AdvancedRobot)this);
-		}
+		enemyHandler.update(e, this, getTime());
 		
 		// if there is only 1 enemy left, lock on target
 		if (getOthers() == 1) {
 			scanDirection *= -1;
 		}
-		
     }
 
 	/**
@@ -179,6 +170,7 @@ public class JaysTestRobot extends AdvancedRobot {
      * If the robot is far away, it will advance at a 20 degree angle, if we're close enough it will circle the enemy.
      */
 	private void doMove() {
+		EnemyBot enemy = enemyHandler.getEnemy();
 		// allow wall avoidance movements to complete
 		if (wallAvoidance == true) {
     		if (getDistanceRemaining() <= 5 && getDistanceRemaining() >= -5) {
@@ -208,7 +200,8 @@ public class JaysTestRobot extends AdvancedRobot {
 	 * If the enemy is travelling, it will shoot ahead at the location the enemy will be, should they continue to drive at the same speed and heading. 
 	 */
 	private void doShoot() {
-		if (enemy.none()) {
+		EnemyBot enemy = enemyHandler.getEnemy();
+		if (enemy.isIdle(getTime())) {
 			// nothing to fire at, therefore return
 			return;
 		}
@@ -220,24 +213,25 @@ public class JaysTestRobot extends AdvancedRobot {
     	double enemyY = enemy.getY();
     	double enemyHeading = enemy.getHeadingRadians();
     	double enemyVelocity = enemy.getVelocity();
+    	double wallProximity = 2;
     	 
     	 
     	double deltaTime = 0;
     	double battleFieldHeight = getBattleFieldHeight(), 
     	       battleFieldWidth = getBattleFieldWidth();
     	double predictedX = enemyX, predictedY = enemyY;
-    	while((++deltaTime) * (20.0 - 3.0 * firePower) < 
+    	while((++deltaTime) * getBulletSpeed(firePower) < 
     	      Point2D.Double.distance(myX, myY, predictedX, predictedY)){		
     		predictedX += Math.sin(enemyHeading) * enemyVelocity;	
     		predictedY += Math.cos(enemyHeading) * enemyVelocity;
-    		if(	predictedX < 18.0 
-    			|| predictedY < 18.0
-    			|| predictedX > battleFieldWidth - 18.0
-    			|| predictedY > battleFieldHeight - 18.0){
-    			predictedX = Math.min(Math.max(18.0, predictedX), 
-    	                    battleFieldWidth - 18.0);	
-    			predictedY = Math.min(Math.max(18.0, predictedY), 
-    	                    battleFieldHeight - 18.0);
+    		if(	predictedX < wallProximity 
+    			|| predictedY < wallProximity
+    			|| predictedX > battleFieldWidth - wallProximity
+    			|| predictedY > battleFieldHeight - wallProximity){
+    			predictedX = Math.min(Math.max(wallProximity, predictedX), 
+    	                    battleFieldWidth - wallProximity);	
+    			predictedY = Math.min(Math.max(wallProximity, predictedY), 
+    	                    battleFieldHeight - wallProximity);
     			break;
     		}
     	}
@@ -247,26 +241,16 @@ public class JaysTestRobot extends AdvancedRobot {
     	setTurnGunRightRadians(Utils.normalRelativeAngle(theta - getGunHeadingRadians()));
     	
     	// shoot to kill if the gun is aimed and not too hot
-    	if (getGunHeat() == 0 && Math.abs(getGunTurnRemaining()) < 10) {
+    	if (getGunHeat() <= firePower && Math.abs(getGunTurnRemaining()) < 1) {
     		setFire(firePower);
     	}
 	}
 
 	@Override
 	public void onRobotDeath(RobotDeathEvent e) {
-		// check if the enemy we were tracking died
-		if (e.getName().equals(enemy.getName())) {
-			enemy.reset();
-		}
+		enemyHandler.death(e);
 	}   
-	/**
-	 * Stops the radar spinning once a target is found, and locks onto the target
-	 * @param e The robot to lock onto
-	 */
-	private void radarLock() {
-		// basic 1v1 radar creating a permanent lock
-    	setTurnRadarRight(2.0 * Utils.normalRelativeAngleDegrees(getHeading() - getRadarHeading() + enemy.getBearing()));
-	}
+
 	
     /**
      * Do a victory dance
@@ -283,10 +267,21 @@ public class JaysTestRobot extends AdvancedRobot {
      * Returns fire power based on how far away the enemy is
      * @param distance: the distance away from you the enemy is
      */
-    private static double getFirePower(double distance) {
-    	if (distance < 200) return 3 * MAX_FIRE_POWER;
-    	else if (distance < 400) return 2 * MAX_FIRE_POWER;
-    	else return 1 * MAX_FIRE_POWER;
+    private double getFirePower(double distance) {
+    	double power = 0;
+    	double maxPower = MAX_FIRE_POWER;
+    	double energy = this.getEnergy();
+    	// multiplier will reduce the amount of power as our energy depletes
+    	double multiplier = energy / 100;
+    	
+    	
+    	
+    	if (distance < 200) power = 3 * maxPower;
+    	else if (distance < 400) power = 2 * maxPower;
+    	else power = 1 * maxPower;
+    	
+    	// should prevent running out of power
+    	return power * multiplier;
     }
 
     /**
@@ -295,7 +290,8 @@ public class JaysTestRobot extends AdvancedRobot {
      * @param speed: speed of object
      * @return double: time
      */
-    private static double getTravelTime(double distance, double speed) {
+    @SuppressWarnings("unused")
+	private static double getTravelTime(double distance, double speed) {
     	return distance / speed;
     }
     
@@ -304,7 +300,7 @@ public class JaysTestRobot extends AdvancedRobot {
      * @param power: power you're applying to the bullet
      * @return double: speed of the bullet
      */
-    private static double getBulletSpeed(double firePower) {
+	private static double getBulletSpeed(double firePower) {
     	return 20 - firePower * 3;
     }
 

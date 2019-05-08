@@ -17,13 +17,13 @@ public class EnemyHandler {
 		// search for enemy, if exists, update entry
 		for (EnemyBot enemy : EnemyHandler.enemies) {
 			if (e.getName().equals(enemy.getName())) {
-				enemy.update(e, r, gameTime);
+				enemy.update(e, r);
 				enemyFound = true;
 				break;
 			}
 		}
 		// enemy wasn't found, therefore we will add the enemy
-		if (!enemyFound) addEnemy(e, r, gameTime);
+		if (!enemyFound) addEnemy(e, r);
 		
 		// update the currentTarget
 		EnemyBot closestEnemy = getClosestEnemy();
@@ -35,9 +35,9 @@ public class EnemyHandler {
 			}
 		} 
 	}
-	private void addEnemy(ScannedRobotEvent e, AdvancedRobot r, long gameTime) {
+	private void addEnemy(ScannedRobotEvent e, AdvancedRobot r) {
 		EnemyBot enemy = new EnemyBot();
-		enemy.update(e, r, gameTime);
+		enemy.update(e, r);
 		EnemyHandler.enemies.add(enemy);
 	}
 	public EnemyBot getClosestEnemy() {
@@ -45,7 +45,7 @@ public class EnemyHandler {
 		
 		for (int i = 0; i < enemies.size(); i++) {
 			// we only want to update if the enemy is alive 
-			if (enemies.get(i).getEnergy() > 0) {
+			if (enemies.get(i).isAlive()) {
 				// if we aren't locked onto a target, or we find a closer target, update
 				if (enemyI == -1 || enemies.get(i).getDistance() < enemies.get(enemyI).getDistance()) {
 					enemyI = i;

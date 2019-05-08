@@ -19,7 +19,6 @@ public class JaysRobot extends AdvancedRobot {
 	private boolean wallAvoidance = false;
 	private double enemyProximity = 200; //how close to enemy should we get
 	private byte scanDirection = 1;
-	
 	// this is to track the direction of the robot, this is so we can drive backwards 
 	// if the shortest rotation to our bearing would be to reverse instead
 	private int robotDirection = 1;
@@ -33,6 +32,7 @@ public class JaysRobot extends AdvancedRobot {
 		// wiki states this is essential
 		setAdjustGunForRobotTurn(true);
 		setAdjustRadarForGunTurn(true);
+		setAdjustRadarForRobotTurn(true);
 		
 		// setting colours for my robot
         setBodyColor(new Color(0,255,0));
@@ -47,7 +47,7 @@ public class JaysRobot extends AdvancedRobot {
         	doMove();
         	doShoot();
         	execute();
-        	System.out.println("enemy health: " + this.enemyHandler.getEnemy().getEnergy());
+        	//System.out.println(this.enemyHandler.getEnemy().toString());
         }
 	}
 	@Override
@@ -211,24 +211,25 @@ public class JaysRobot extends AdvancedRobot {
     	double enemyY = enemy.getY();
     	double enemyHeading = enemy.getHeadingRadians();
     	double enemyVelocity = enemy.getVelocity();
+    	double wallProximity = 2;
     	 
     	 
     	double deltaTime = 0;
     	double battleFieldHeight = getBattleFieldHeight(), 
     	       battleFieldWidth = getBattleFieldWidth();
     	double predictedX = enemyX, predictedY = enemyY;
-    	while((++deltaTime) * (20.0 - 3.0 * firePower) < 
+    	while((++deltaTime) * getBulletSpeed(firePower) < 
     	      Point2D.Double.distance(myX, myY, predictedX, predictedY)){		
     		predictedX += Math.sin(enemyHeading) * enemyVelocity;	
     		predictedY += Math.cos(enemyHeading) * enemyVelocity;
-    		if(	predictedX < 18.0 
-    			|| predictedY < 18.0
-    			|| predictedX > battleFieldWidth - 18.0
-    			|| predictedY > battleFieldHeight - 18.0){
-    			predictedX = Math.min(Math.max(18.0, predictedX), 
-    	                    battleFieldWidth - 18.0);	
-    			predictedY = Math.min(Math.max(18.0, predictedY), 
-    	                    battleFieldHeight - 18.0);
+    		if(	predictedX < wallProximity 
+    			|| predictedY < wallProximity
+    			|| predictedX > battleFieldWidth - wallProximity
+    			|| predictedY > battleFieldHeight - wallProximity){
+    			predictedX = Math.min(Math.max(wallProximity, predictedX), 
+    	                    battleFieldWidth - wallProximity);	
+    			predictedY = Math.min(Math.max(wallProximity, predictedY), 
+    	                    battleFieldHeight - wallProximity);
     			break;
     		}
     	}
@@ -238,7 +239,7 @@ public class JaysRobot extends AdvancedRobot {
     	setTurnGunRightRadians(Utils.normalRelativeAngle(theta - getGunHeadingRadians()));
     	
     	// shoot to kill if the gun is aimed and not too hot
-    	if (getGunHeat() == 0 && Math.abs(getGunTurnRemaining()) < 10) {
+    	if (getGunHeat() <= firePower && Math.abs(getGunTurnRemaining()) < 1) {
     		setFire(firePower);
     	}
 	}
@@ -264,10 +265,21 @@ public class JaysRobot extends AdvancedRobot {
      * Returns fire power based on how far away the enemy is
      * @param distance: the distance away from you the enemy is
      */
-    private static double getFirePower(double distance) {
-    	if (distance < 200) return 3 * MAX_FIRE_POWER;
-    	else if (distance < 400) return 2 * MAX_FIRE_POWER;
-    	else return 1 * MAX_FIRE_POWER;
+    private double getFirePower(double distance) {
+    	double power = 0;
+    	double maxPower = MAX_FIRE_POWER;
+    	double energy = this.getEnergy();
+    	// multiplier will reduce the amount of power as our energy depletes
+    	double multiplier = energy / 100;
+    	
+    	
+    	
+    	if (distance < 200) power = 3 * maxPower;
+    	else if (distance < 400) power = 2 * maxPower;
+    	else power = 1 * maxPower;
+    	
+    	// should prevent running out of power
+    	return power * multiplier;
     }
 
     /**
@@ -286,7 +298,6 @@ public class JaysRobot extends AdvancedRobot {
      * @param power: power you're applying to the bullet
      * @return double: speed of the bullet
      */
-    @SuppressWarnings("unused")
 	private static double getBulletSpeed(double firePower) {
     	return 20 - firePower * 3;
     }

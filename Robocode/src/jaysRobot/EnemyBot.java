@@ -8,34 +8,44 @@ public class EnemyBot {
 
 	private String name = "";
 	private long lastUpdate = 0;
-	private final long idleTimeout = 1000; //not good, just realised this won't timeout faster if the game speed is increased, should count ticks instead of sys time
+	private long updateTime = 0;
+	private final long idleTimeout = 50; //not good, just realised this won't timeout faster if the game speed is increased, should count ticks instead of sys time
 	private double bearingRadians = 0.0;
 	private double distance = 0.0;
 	private double energy = 0.0;
+	private double previousHeadingRadians = 0.0;
 	private double headingRadians = 0.0;
 	private double velocity = 0.0;
 	private int X = 0;
 	private int Y = 0;
-	private boolean alive = true;
+	private boolean alive = false;
+	private double turnRate = 0.0;
 	
-	public void update(ScannedRobotEvent e, AdvancedRobot r, long gameTime) {
+	public void update(ScannedRobotEvent e, AdvancedRobot r) {
 		this.name = e.getName();
-		this.lastUpdate = gameTime;
+		this.lastUpdate = this.updateTime;
+		this.updateTime = e.getTime();
 		this.bearingRadians = e.getBearingRadians();
 		this.distance = e.getDistance();
 		this.energy = e.getEnergy();
+		this.previousHeadingRadians = this.headingRadians;
 		this.headingRadians = e.getHeadingRadians();
 		this.velocity = e.getVelocity();
 		double angle = Math.toRadians((r.getHeading() + e.getBearing()) % 360);
 		this.X = (int)(r.getX() + Math.sin(angle) * e.getDistance());
 		this.Y = (int)(r.getY() + Math.cos(angle) * e.getDistance());
 		this.alive = true;
+		// calculate turn rate if the robot is alive,
+		// if the robot is dead it likely doesn't have an accurate previous heading
+		if (isAlive()) {
+			this.turnRate = (headingRadians - previousHeadingRadians) / (this.updateTime - this.lastUpdate);
+		}
 	}
 	public String getName() {
 		return name;
 	}
-	public double timeSinceLastUpdate() {
-		return System.currentTimeMillis() - this.lastUpdate;
+	public long timeSinceLastUpdate(long gameTime) {
+		return gameTime - this.updateTime;
 	}
 	public double getBearingRadians() {
 		return bearingRadians;
@@ -69,21 +79,32 @@ public class EnemyBot {
 	 * @return
 	 */
 	public boolean isIdle(long gameTime) {
-		return (this.energy == 0.0) || (gameTime - this.lastUpdate) > this.idleTimeout;
+		return (this.isAlive() == false) || (gameTime - this.lastUpdate) > this.idleTimeout;
 	}
 	public void death(RobotDeathEvent e) {
 		this.name = e.getName();
-		this.lastUpdate = System.currentTimeMillis();
-		this.bearingRadians = 0.0;
-		this.distance = 0.0;
+		this.lastUpdate = e.getTime();
 		this.energy = 0.0;
-		this.headingRadians = 0.0;
-		this.velocity = 0.0;
-		this.X = 0;
-		this.Y = 0;
 		this.alive = false;
 	}
 	public boolean isAlive() {
 		return alive;
+	}
+	@Override
+	public String toString() {
+		StringBuilder str = new StringBuilder();
+		str.append("\nEnemy Details");
+		str.append("\nname: " + this.getName());
+		str.append("\nidleTimeout: " + this.idleTimeout);
+		str.append("\nlastUpdate: " + this.lastUpdate);
+		str.append("\nbearingRadians: " + this.getBearingRadians());
+		str.append("\ndistance: " + this.getDistance());
+		str.append("\nenergy: " + this.getEnergy());
+		str.append("\nheadingRadians: " + this.getHeadingRadians());
+		str.append("\nvelocity: " + this.getVelocity());
+		str.append("\nx: " + this.getX());
+		str.append("\ny: " + this.getY());
+		str.append("\nalive: " + this.isAlive());
+		return str.toString();
 	}
 }

@@ -6,7 +6,6 @@ import java.awt.geom.Point2D;
 import robocode.AdvancedRobot;
 import robocode.Condition;
 import robocode.CustomEvent;
-import robocode.HitByBulletEvent;
 import robocode.HitRobotEvent;
 import robocode.RobotDeathEvent;
 import robocode.ScannedRobotEvent;
@@ -15,8 +14,9 @@ import robocode.util.Utils;
 
 public class JaysRobot extends AdvancedRobot {
 	private static double MAX_FIRE_POWER = 1; // max power multiplier, should be in the range 0-1
+	private static boolean DEBUG = false;
 	private static int WALL_MARGIN = 100;
-	private boolean wallAvoidance = false;
+	private double wallAvoidance = 0.0;
 	private double enemyProximity = 200; //how close to enemy should we get
 	private byte scanDirection = 1;
 	// this is to track the direction of the robot, this is so we can drive backwards 
@@ -47,9 +47,10 @@ public class JaysRobot extends AdvancedRobot {
         	doMove();
         	doShoot();
         	execute();
-        	//System.out.println(this.enemyHandler.getEnemy().toString());
+        	if (DEBUG) System.out.println(this.enemyHandler.getEnemy().toString());
         }
 	}
+	
 	@Override
 	public void onPaint(Graphics2D g) {
 		EnemyBot enemy = enemyHandler.getEnemy();
@@ -63,12 +64,14 @@ public class JaysRobot extends AdvancedRobot {
 		 
 		    // Draw a filled square on top of the scanned robot that covers it
 		    g.fillRect( enemy.getX() - 20,  enemy.getY() - 20, 40, 40);
+		    
+		    // Draw a rectangle to display the wall margin
+		    g.drawRect(WALL_MARGIN, WALL_MARGIN, (int)getBattleFieldWidth() - WALL_MARGIN*2, (int)getBattleFieldHeight() - WALL_MARGIN*2);
+		    
+		    if (this.wallAvoidance != 0) {
+		    	g.fillRect((int)getX()-20, (int)getY()-20, 40, 40);
+		    }
 		}
-	}
-	@Override
-	public void onHitByBullet(HitByBulletEvent event) {
-		super.onHitByBullet(event);
-		//setAllColors(Color.red);
 	}
 	
 	/**
@@ -87,56 +90,6 @@ public class JaysRobot extends AdvancedRobot {
 			scanDirection *= -1;
 		}
     }
-
-	/**
-	 * Handles our custom events, such as getting close to the walls
-	 */
-	public void onCustomEvent(CustomEvent e) {
-		if (e.getCondition().getName().equals("Too close to wall"))
-		{
-			// if we're not already trying to avoid the wall, drive towards the center of the map 
-			if (wallAvoidance == false) {
-				// set wall avoidance true
-				wallAvoidance = true;
-				double centerX = getBattleFieldWidth()/2;
-				double centerY = getBattleFieldHeight()/2;
-		    	// get the heading
-				double heading = getHeadingToObject(centerX, centerY);
-				// calculate the fastest way of turning to this heading and set correct direction
-				// if turning 120 degrees, you could instead turn 60 degrees and drive backwards 
-				travelDirection = 1;
-				doTurnRightRadians(heading);
-				setAhead(100 * travelDirection * robotDirection);
-			}
-		}
-	}
-
-	/**
-	 * Turns the robot to the heading in the most efficient direction, and reverses the orientation of the robot if going backwards is faster 
-	 * @param heading The heading in radians that you wish to turn to
-	 * @see doTurnRightDegrees
-	 */
-	private void doTurnRightRadians(double heading) {
-		if (heading > Math.PI / 2) { // if turning more than 90 degrees
-			heading = Math.PI - heading;
-			robotDirection = -1;
-		} else if (heading < (Math.PI / 2) * -1) { // if turning more than 90 degrees
-			heading = (Math.PI * -1) + heading;
-			robotDirection = -1;
-		} else {
-			robotDirection = 1;
-		}
-		setTurnRightRadians(heading);
-	}
-	
-	/**
-	 * Turns the robot to the heading in the most efficient direction, and reverses the orientation of the robot if going backwards is faster 
-	 * @param heading The heading in degrees that you wish to turn to
-	 * @see doTurnRightRadians
-	 */
-	private void doTurnRightDegrees(double heading) {
-		doTurnRightRadians(Math.toRadians(heading));
-	}
 	
 	/**
 	 * Handles the creation of our custom events, such as detecting wall proximity
@@ -158,6 +111,53 @@ public class JaysRobot extends AdvancedRobot {
 		});
 	}
     
+	/**
+	 * Handles our custom events, such as getting close to the walls
+	 */
+	public void onCustomEvent(CustomEvent e) {
+		if (e.getCondition().getName().equals("Too close to wall"))
+		{
+			// if we're not already trying to avoid the wall, drive towards the center of the map 
+			if (wallAvoidance == 0) {
+				// set wall avoidance true
+				wallAvoidance = 30;
+			}
+		}
+	}
+
+	/**
+	 * Turns the robot to the heading in the most efficient direction, and reverses the orientation of the robot if going backwards is faster 
+	 * @param heading The heading in radians that you wish to turn to
+	 * @see doTurnRightDegrees
+	 */
+	private void doTurnRightRadians(double heading) {
+		while (heading > Math.PI) {
+			heading -= (Math.PI * 2);
+		}
+		while (heading < (Math.PI * -1)) {
+			heading += (Math.PI * 2);
+		}
+		
+		if (heading > (Math.PI / 2)) { // if turning more than 90 degrees
+			heading -= Math.PI;
+			robotDirection = -1;
+		} else if (heading < ((Math.PI / 2) * -1)) { // if turning more than 90 degrees
+			heading += (Math.PI);
+			robotDirection = -1;
+		} else {
+			robotDirection = 1;
+		}
+		setTurnRightRadians(heading);
+	}
+	
+	/**
+	 * Turns the robot to the heading in the most efficient direction, and reverses the orientation of the robot if going backwards is faster 
+	 * @param heading The heading in degrees that you wish to turn to
+	 * @see doTurnRightRadians
+	 */
+	private void doTurnRightDegrees(double heading) {
+		doTurnRightRadians(Math.toRadians(heading));
+	}
 
 	private void doScan() {
 		setTurnRadarRight(360*scanDirection);
@@ -170,23 +170,28 @@ public class JaysRobot extends AdvancedRobot {
 	private void doMove() {
 		EnemyBot enemy = enemyHandler.getEnemy();
 		// allow wall avoidance movements to complete
-		if (wallAvoidance == true) {
-    		if (getDistanceRemaining() <= 5 && getDistanceRemaining() >= -5) {
-    			wallAvoidance = false;
-    		}
+		if (wallAvoidance > 0) {
+			double centerX = getBattleFieldWidth()/2;
+			double centerY = getBattleFieldHeight()/2;
+	    	// get the heading
+			double heading = getHeadingToObject(centerX, centerY);
+			doTurnRightRadians(heading);
+			setAhead(100 * robotDirection);
+			wallAvoidance--;
     	} else {
-			
+
+	    	if (Math.random() > 0.99) {
+	    		travelDirection *= -1;
+	    	} 
+    		
 			//approach enemy if we're too far away
-			double approachAngle = enemy.getDistance() > enemyProximity ? (20 * travelDirection) : 0;
+			double approachAngle = enemy.getDistance() > enemyProximity ? (40 * travelDirection) : (-10 * travelDirection);
 			
 			doTurnRightDegrees(enemy.getBearing() + 90 - approachAngle);
 	    	
-	    	
-	    	if (Math.random() > 0.90) {
-	    		travelDirection *= -1;
-	    	} 
-	    	setAhead(100 * travelDirection);
+	    	setAhead(100 * travelDirection * robotDirection);
     	}
+		
 	}
 	
 	public void onHitRobot(HitRobotEvent e) {
@@ -231,15 +236,17 @@ public class JaysRobot extends AdvancedRobot {
     	 
     			predictedX = Math.min(Math.max(0, predictedX), battleFieldWidth);	
     			predictedY = Math.min(Math.max(0, predictedY), battleFieldHeight);
+    			if (DEBUG) System.out.println("deltaTime exited in if:" + deltaTime);
     			break;
     		}
     	}
+		if (DEBUG) System.out.println("deltaTime exited from loop:" + deltaTime);
     	double theta = Utils.normalAbsoluteAngle(Math.atan2(predictedX - getX(), predictedY - getY()));
     	 
     	setTurnGunRightRadians(Utils.normalRelativeAngle(theta - getGunHeadingRadians()));
     	
     	// shoot to kill if the gun is aimed and not too hot
-    	if (getGunHeat() <= firePower && Math.abs(getGunTurnRemaining()) < 10) {
+    	if (getGunHeat() <= firePower && Math.abs(getGunTurnRemaining()) < 5) {
     		setFire(firePower);
     	}
 	}
@@ -295,28 +302,25 @@ public class JaysRobot extends AdvancedRobot {
 		if (myX == oX && myY == oY) {
 			return 0;
 		}
-		double theta = Math.atan2(myY - oY, myX - oX);
-		
+		double theta = Math.atan2(oY - myY, oX - myX);
 		/* convert theta to match the game logic,
 		 * theta is counter clockwise from the x axis
 		 * game logic is clockwise from the y axis
 		 */
-		
-		theta *= -1; // swap to clockwise
 		theta -= (Math.PI /2); // subtract 90 degrees worth of radians to move from x to y axis
+		theta *= -1; // swap to clockwise
 		
 		theta -= getHeadingRadians(); //remove the current rotation to give a heading rather than a bearing
 		
 		// correct the radians if the number is now too low
-		while (theta < Math.PI) {
-			theta += Math.PI*2; // add 360 degrees of radians
+		while (theta < (Math.PI * -1)) {
+			theta += Math.PI * 2; // add 360 degrees of radians
 		}
 		
-		// set up to rotate the fastest possible direction
+		// correct the radians if the number is now too high
 		if (theta > Math.PI) {
-			theta -= Math.PI * 2;
+			theta -= Math.PI * 2; // subtract 360 degrees of radians
 		}
-		
 		return theta;
 	}
 

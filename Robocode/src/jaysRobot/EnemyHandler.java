@@ -69,4 +69,7 @@ public class EnemyHandler {
 			}
 		}
 	}
+	public ArrayList<EnemyBot> getEnemies(){
+		return EnemyHandler.enemies;
+	}
 }

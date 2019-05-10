@@ -20,14 +20,11 @@ public class JaysRobot extends AdvancedRobot {
 	private double wallAvoidance = 0.0;
 	private double enemyProximity = 500; //how close to enemy should we get
 	private byte scanDirection = 1;
-	// this is to track the direction of the robot, this is so we can drive backwards 
-	// if the shortest rotation to our bearing would be to reverse instead
-	private int robotDirection = 1;
 	// this is to track the direction of travel, forwards or backwards
 	private int travelDirection = 1;
 	
 	private EnemyHandler enemyHandler = new EnemyHandler();
-	private MovementHandler movement = new MovementHandler(this);
+	private MovementHandler movement = new MovementHandler(this, enemyHandler);
 	
 	public void run() {
 		// setting radar / gun to be able to turn independently of each other
@@ -46,7 +43,7 @@ public class JaysRobot extends AdvancedRobot {
         addCustomEvents();
         while (true) {
         	doScan();
-        	movement.antiGravMove();
+        	movement.antiGravMove(this, enemyHandler);
         	doShoot();
         	execute();
         	if (DEBUG) System.out.println(this.enemyHandler.getEnemy().toString());
@@ -127,40 +124,6 @@ public class JaysRobot extends AdvancedRobot {
 		}
 	}
 
-	/**
-	 * Turns the robot to the heading in the most efficient direction, and reverses the orientation of the robot if going backwards is faster 
-	 * @param heading The heading in radians that you wish to turn to
-	 * @see doTurnRightDegrees
-	 */
-	private void doTurnRightRadians(double heading) {
-		while (heading > Math.PI) {
-			heading -= (Math.PI * 2);
-		}
-		while (heading < (Math.PI * -1)) {
-			heading += (Math.PI * 2);
-		}
-		
-		if (heading > (Math.PI / 2)) { // if turning more than 90 degrees
-			heading -= Math.PI;
-			robotDirection = -1;
-		} else if (heading < ((Math.PI / 2) * -1)) { // if turning more than 90 degrees
-			heading += (Math.PI);
-			robotDirection = -1;
-		} else {
-			robotDirection = 1;
-		}
-		setTurnRightRadians(heading);
-	}
-	
-	/**
-	 * Turns the robot to the heading in the most efficient direction, and reverses the orientation of the robot if going backwards is faster 
-	 * @param heading The heading in degrees that you wish to turn to
-	 * @see doTurnRightRadians
-	 */
-	private void doTurnRightDegrees(double heading) {
-		doTurnRightRadians(Math.toRadians(heading));
-	}
-
 	private void doScan() {
 		setTurnRadarRight(360*scanDirection);
 	}
@@ -169,7 +132,7 @@ public class JaysRobot extends AdvancedRobot {
      * Moves the robot depending where the enemy is.
      * If the robot is far away, it will advance at a 20 degree angle, if we're close enough it will circle the enemy.
      */
-	private void doMove() {
+	/*private void doMove() {
 		EnemyBot enemy = enemyHandler.getEnemy();
 		// allow wall avoidance movements to complete
 		if (wallAvoidance > 0) {
@@ -194,10 +157,10 @@ public class JaysRobot extends AdvancedRobot {
 	    	setAhead(100 * travelDirection * robotDirection);
     	}
 		
-	}
+	}*/
 	
 	public void onHitRobot(HitRobotEvent e) {
-		travelDirection *= -1;
+		this.movement.reverseTravelDirection();
 	}
 	
 	/**

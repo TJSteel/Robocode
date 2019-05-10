@@ -31,7 +31,7 @@ public class EnemyBot {
 		this.previousHeadingRadians = this.headingRadians;
 		this.headingRadians = e.getHeadingRadians();
 		this.velocity = e.getVelocity();
-		double angle = Math.toRadians((r.getHeading() + e.getBearing()) % 360);
+		double angle = (r.getHeadingRadians() + bearingRadians) % (Math.PI * 2); // % (Math.PI * 2) basically removes extra full rotations 
 		this.X = (int)(r.getX() + Math.sin(angle) * e.getDistance());
 		this.Y = (int)(r.getY() + Math.cos(angle) * e.getDistance());
 		this.alive = true;

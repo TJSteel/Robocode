@@ -3,6 +3,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 
+import movement.MovementHandler;
 import robocode.AdvancedRobot;
 import robocode.Condition;
 import robocode.CustomEvent;
@@ -17,7 +18,7 @@ public class JaysRobot extends AdvancedRobot {
 	private static boolean DEBUG = false;
 	private static int WALL_MARGIN = 100;
 	private double wallAvoidance = 0.0;
-	private double enemyProximity = 200; //how close to enemy should we get
+	private double enemyProximity = 500; //how close to enemy should we get
 	private byte scanDirection = 1;
 	// this is to track the direction of the robot, this is so we can drive backwards 
 	// if the shortest rotation to our bearing would be to reverse instead
@@ -26,6 +27,7 @@ public class JaysRobot extends AdvancedRobot {
 	private int travelDirection = 1;
 	
 	private EnemyHandler enemyHandler = new EnemyHandler();
+	private MovementHandler movement = new MovementHandler(this);
 	
 	public void run() {
 		// setting radar / gun to be able to turn independently of each other
@@ -44,7 +46,7 @@ public class JaysRobot extends AdvancedRobot {
         addCustomEvents();
         while (true) {
         	doScan();
-        	doMove();
+        	movement.antiGravMove();
         	doShoot();
         	execute();
         	if (DEBUG) System.out.println(this.enemyHandler.getEnemy().toString());
@@ -63,7 +65,7 @@ public class JaysRobot extends AdvancedRobot {
 		    g.drawLine((int)getX(), (int)getY(), enemy.getX(), enemy.getY());
 		 
 		    // Draw a filled square on top of the scanned robot that covers it
-		    g.fillRect( enemy.getX() - 20,  enemy.getY() - 20, 40, 40);
+		    g.fillRect(enemy.getX() - 20,  enemy.getY() - 20, 40, 40);
 		    
 		    // Draw a rectangle to display the wall margin
 		    g.drawRect(WALL_MARGIN, WALL_MARGIN, (int)getBattleFieldWidth() - WALL_MARGIN*2, (int)getBattleFieldHeight() - WALL_MARGIN*2);

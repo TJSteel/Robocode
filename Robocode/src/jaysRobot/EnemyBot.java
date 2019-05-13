@@ -1,5 +1,8 @@
 package jaysRobot;
 
+import java.util.ArrayList;
+
+import movement.Bullet;
 import robocode.AdvancedRobot;
 import robocode.RobotDeathEvent;
 import robocode.ScannedRobotEvent;
@@ -12,6 +15,7 @@ public class EnemyBot {
 	private final long idleTimeout = 50; //not good, just realised this won't timeout faster if the game speed is increased, should count ticks instead of sys time
 	private double bearingRadians = 0.0;
 	private double distance = 0.0;
+	private double lastEnergy = 0.0;
 	private double energy = 0.0;
 	private double previousHeadingRadians = 0.0;
 	private double headingRadians = 0.0;
@@ -20,25 +24,41 @@ public class EnemyBot {
 	private int Y = 0;
 	private boolean alive = false;
 	private double turnRate = 0.0;
+	private ArrayList<Bullet> bullets = new ArrayList<Bullet>();
 	
+	public ArrayList<Bullet> getBullets() {
+		return bullets;
+	}
 	public void update(ScannedRobotEvent e, AdvancedRobot r) {
 		this.name = e.getName();
 		this.lastUpdate = this.updateTime;
 		this.updateTime = e.getTime();
 		this.bearingRadians = e.getBearingRadians();
 		this.distance = e.getDistance();
+		this.lastEnergy = this.energy;
 		this.energy = e.getEnergy();
 		this.previousHeadingRadians = this.headingRadians;
 		this.headingRadians = e.getHeadingRadians();
 		this.velocity = e.getVelocity();
 		double angle = (r.getHeadingRadians() + bearingRadians) % (Math.PI * 2); // % (Math.PI * 2) basically removes extra full rotations 
-		this.X = (int)(r.getX() + Math.sin(angle) * e.getDistance());
-		this.Y = (int)(r.getY() + Math.cos(angle) * e.getDistance());
+		this.X = (int) Calc.getObjectX(r.getX(), angle, e.getDistance());
+		this.Y = (int) Calc.getObjectY(r.getY(), angle, e.getDistance());
 		this.alive = true;
-		// calculate turn rate if the robot is alive,
-		// if the robot is dead it likely doesn't have an accurate previous heading
-		if (isAlive()) {
-			this.turnRate = (headingRadians - previousHeadingRadians) / (this.updateTime - this.lastUpdate);
+		this.turnRate = (headingRadians - previousHeadingRadians) / (this.updateTime - this.lastUpdate);
+		
+		this.checkEnergyDrop(r);
+
+	}
+	private void checkEnergyDrop(AdvancedRobot r) {
+		double lastEnergy = this.getLastEnergy();
+		double energy = this.getEnergy();
+		double energyDrop = lastEnergy - energy;
+		double x = this.getX();
+		double y = this.getY();
+		if (energyDrop > 0 && energyDrop <= 3) {
+			//suspect bullet was fired
+			this.bullets.add(new Bullet(this.updateTime, x, y, energyDrop, Calc.getBulletSpeed(energyDrop), Calc.getHeadingToObject(x, y, r.getX(), r.getY())));
+			
 		}
 	}
 	public String getName() {
@@ -55,6 +75,9 @@ public class EnemyBot {
 	}
 	public double getDistance() {
 		return distance;
+	}
+	public double getLastEnergy() {
+		return lastEnergy;
 	}
 	public double getEnergy() {
 		return energy;
@@ -112,5 +135,19 @@ public class EnemyBot {
 		str.append("\ny: " + this.getY());
 		str.append("\nalive: " + this.isAlive());
 		return str.toString();
+	}
+	public void hitBy(robocode.Bullet bullet) {
+		/* The bullet will do (4 * power) damage if it hits another robot. If power is greater than 1, it will
+		 * do an additional 2 * (power - 1) damage. You will get (3 * power) back if you hit the other robot.  
+		 */
+		double power = bullet.getPower(); 
+		double damage = power * 4;
+		if (power > 1) {
+			damage += 2 * (power - 1);
+		}
+		this.energy -= damage;
+	}
+	public void clearBullets() {
+		this.bullets.clear();
 	}
 }

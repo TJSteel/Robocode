@@ -3,29 +3,32 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 
+import movement.Bullet;
 import movement.MovementHandler;
 import robocode.AdvancedRobot;
+import robocode.BulletHitBulletEvent;
 import robocode.Condition;
 import robocode.CustomEvent;
+import robocode.DeathEvent;
+import robocode.HitByBulletEvent;
 import robocode.HitRobotEvent;
 import robocode.RobotDeathEvent;
 import robocode.ScannedRobotEvent;
+import robocode.StatusEvent;
 import robocode.WinEvent;
 import robocode.util.Utils;
 
 public class JaysRobot extends AdvancedRobot {
 	private static double MAX_FIRE_POWER = 1; // max power multiplier, should be in the range 0-1
 	private static boolean DEBUG = false;
-	private static int WALL_MARGIN = 100;
-	private double wallAvoidance = 0.0;
-	private double enemyProximity = 500; //how close to enemy should we get
 	private byte scanDirection = 1;
-	// this is to track the direction of travel, forwards or backwards
-	private int travelDirection = 1;
+	private int robotDirection = 1;
+	private static double WALL_MARGIN = 100;
 	
 	private EnemyHandler enemyHandler = new EnemyHandler();
 	private MovementHandler movement = new MovementHandler(this, enemyHandler);
 	
+	@Override
 	public void run() {
 		// setting radar / gun to be able to turn independently of each other
 		// wiki states this is essential
@@ -43,7 +46,7 @@ public class JaysRobot extends AdvancedRobot {
         addCustomEvents();
         while (true) {
         	doScan();
-        	movement.antiGravMove(this, enemyHandler);
+        	movement.move();
         	doShoot();
         	execute();
         	if (DEBUG) System.out.println(this.enemyHandler.getEnemy().toString());
@@ -52,8 +55,9 @@ public class JaysRobot extends AdvancedRobot {
 	
 	@Override
 	public void onPaint(Graphics2D g) {
+		long time = getTime();
 		EnemyBot enemy = enemyHandler.getEnemy();
-		if (!enemy.isIdle(getTime())) {
+		if (!enemy.isIdle(time)) {
 		    
 		    // Set the paint color to a red half transparent color
 		    g.setColor(new Color(0xff, 0x00, 0x00, 0x80));
@@ -63,19 +67,13 @@ public class JaysRobot extends AdvancedRobot {
 		 
 		    // Draw a filled square on top of the scanned robot that covers it
 		    g.fillRect(enemy.getX() - 20,  enemy.getY() - 20, 40, 40);
-		    
-		    // Draw a rectangle to display the wall margin
-		    g.drawRect(WALL_MARGIN, WALL_MARGIN, (int)getBattleFieldWidth() - WALL_MARGIN*2, (int)getBattleFieldHeight() - WALL_MARGIN*2);
-		    
-		    if (this.wallAvoidance != 0) {
-		    	g.fillRect((int)getX()-20, (int)getY()-20, 40, 40);
-		    }
+		}
+		for (Bullet b : enemyHandler.getBullets()) {
+			g.drawOval((int)b.getX(time)-25, (int)b.getY(time)-25, 50, 50);
 		}
 	}
-	
-	/**
-	 * Most of our code will be here, this event is triggered when we spot another robot
-	 */
+
+	@Override
 	public void onScannedRobot(ScannedRobotEvent e) {
 		// we don't want to attack sentries
 		if (e.isSentryRobot()) {
@@ -94,18 +92,10 @@ public class JaysRobot extends AdvancedRobot {
 	 * Handles the creation of our custom events, such as detecting wall proximity
 	 */
 	private void addCustomEvents() {
-		addCustomEvent(new Condition("Too close to wall") {
+		addCustomEvent(new Condition("Custom Event") {
 			@Override
 			public boolean test() {
-				return (
-				// we're too close to the left wall
-				(getX() <= WALL_MARGIN ||
-				// or we're too close to the right wall
-				getX() >= getBattleFieldWidth() - WALL_MARGIN ||
-				// or we're too close to the bottom wall
-				getY() <= WALL_MARGIN ||
-				// or we're too close to the top wall
-				getY() >= getBattleFieldHeight() - WALL_MARGIN));
+				return false;
 			}
 		});
 	}
@@ -113,14 +103,10 @@ public class JaysRobot extends AdvancedRobot {
 	/**
 	 * Handles our custom events, such as getting close to the walls
 	 */
+	@Override
 	public void onCustomEvent(CustomEvent e) {
-		if (e.getCondition().getName().equals("Too close to wall"))
+		if (e.getCondition().getName().equals("Custom Event"))
 		{
-			// if we're not already trying to avoid the wall, drive towards the center of the map 
-			if (wallAvoidance == 0) {
-				// set wall avoidance true
-				wallAvoidance = 30;
-			}
 		}
 	}
 
@@ -159,8 +145,9 @@ public class JaysRobot extends AdvancedRobot {
 		
 	}*/
 	
+	@Override
 	public void onHitRobot(HitRobotEvent e) {
-		this.movement.reverseTravelDirection();
+		
 	}
 	
 	/**
@@ -178,7 +165,7 @@ public class JaysRobot extends AdvancedRobot {
     	double myY = getY();
     	double distance = enemy.getDistance();
     	double firePower = getFirePower(distance);
-    	double bulletSpeed = Game.getBulletSpeed(firePower);
+    	double bulletSpeed = Calc.getBulletSpeed(firePower);
     	double enemyX = enemy.getX();
     	double enemyY = enemy.getY();
     	double enemyHeading = enemy.getHeadingRadians();
@@ -218,14 +205,41 @@ public class JaysRobot extends AdvancedRobot {
 
 	@Override
 	public void onRobotDeath(RobotDeathEvent e) {
-		enemyHandler.death(e);
+		super.onRobotDeath(e);
+		this.enemyHandler.death(e);
 	}   
 
+	@Override
+	public void onBulletHitBullet(BulletHitBulletEvent e) {
+		super.onBulletHitBullet(e);
+		this.enemyHandler.bulletEvent(e.getBullet());
+	}	
+	
+	@Override
+	public void onHitByBullet(HitByBulletEvent e) {
+		super.onHitByBullet(e);
+		this.enemyHandler.bulletEvent(e.getBullet());
+	}
+
+	@Override
+	public void onStatus(StatusEvent e) {
+		// TODO Auto-generated method stub
+		super.onStatus(e);
+	}	
+
+	@Override
+	public void onDeath(DeathEvent event) {
+		// TODO Auto-generated method stub
+		super.onDeath(event);
+		this.enemyHandler.clearBullets();
+	}
 	
     /**
      * Do a victory dance
      */
+	@Override
     public void onWin(WinEvent e) {
+		this.enemyHandler.clearBullets();
         for (int i = 0; i < 50; i++) {
             setTurnRight(10000);
             setTurnGunRight(10000);
@@ -254,39 +268,44 @@ public class JaysRobot extends AdvancedRobot {
     	return power * multiplier;
     }
 
-	/**
-	 * Computes the heading in radians from the robot to the object
-	 * @param oX objects X coordinate
-	 * @param oY objects Y coordinate
-	 * @return bearing to the object
-	 */
-	private double getHeadingToObject(double oX, double oY) {
-		double myX = getX();
-		double myY = getY();
+	/**Move towards an x and y coordinate**/
+	public void goTo(double dX, double dY) {
+		double battleFieldWidth = getBattleFieldWidth();
+		double battleFieldHeight = getBattleFieldHeight();
 		
-		if (myX == oX && myY == oY) {
-			return 0;
-		}
-		double theta = Math.atan2(oY - myY, oX - myX);
-		/* convert theta to match the game logic,
-		 * theta is counter clockwise from the x axis
-		 * game logic is clockwise from the y axis
-		 */
-		theta -= (Math.PI /2); // subtract 90 degrees worth of radians to move from x to y axis
-		theta *= -1; // swap to clockwise
+		if (dX < WALL_MARGIN) dX = WALL_MARGIN;
+		if (dX > battleFieldWidth-WALL_MARGIN) dX = battleFieldWidth - WALL_MARGIN;
+		if (dY < WALL_MARGIN) dY = WALL_MARGIN;
+		if (dY > battleFieldHeight-WALL_MARGIN) dY = battleFieldHeight - WALL_MARGIN;
 		
-		theta -= getHeadingRadians(); //remove the current rotation to give a heading rather than a bearing
-		
-		// correct the radians if the number is now too low
-		while (theta < (Math.PI * -1)) {
-			theta += Math.PI * 2; // add 360 degrees of radians
-		}
-		
-		// correct the radians if the number is now too high
-		if (theta > Math.PI) {
-			theta -= Math.PI * 2; // subtract 360 degrees of radians
-		}
-		return theta;
+	    double distance = Point2D.distance(this.getX(), this.getY(), dX, dY);
+	    double angle = Calc.getHeadingToObject(this.getX(), this.getY(), dX, dY);
+	    this.turnTo(angle);
+	    if (distance < 10) distance = 10;
+	    this.setAhead(distance * robotDirection);
 	}
 
+	/**
+	 * Turns the robot to the angle in the most efficient direction, and reverses the orientation of the robot if going backwards is faster 
+	 * @param angle The angle in radians that you wish to turn to
+	 */
+	public void turnTo(double angle) {
+		double bearing = Utils.normalRelativeAngle(angle - this.getHeadingRadians());
+		final double halfPi = Math.PI / 2;
+		
+		if (bearing > halfPi) { // if turning more than 90 degrees
+			bearing -= Math.PI;
+			robotDirection = -1;
+		} else if (bearing < (-halfPi)) { // if turning more than 90 degrees
+			bearing += (Math.PI);
+			robotDirection = -1;
+		} else {
+			robotDirection = 1;
+		}
+		this.setTurnRightRadians(bearing);
+	}
+
+	public void reverseTravelDirection() {
+		robotDirection *= -1;
+	}	
 }

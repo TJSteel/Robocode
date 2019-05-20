@@ -12,7 +12,7 @@ public class EnemyBot {
 	private String name = "";
 	private long lastUpdate = 0;
 	private long updateTime = 0;
-	private final long idleTimeout = 50; //not good, just realised this won't timeout faster if the game speed is increased, should count ticks instead of sys time
+	private final long idleTimeout = 50;
 	private double bearingRadians = 0.0;
 	private double distance = 0.0;
 	private double lastEnergy = 0.0;

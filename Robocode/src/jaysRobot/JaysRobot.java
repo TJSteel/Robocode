@@ -114,37 +114,6 @@ public class JaysRobot extends AdvancedRobot {
 		setTurnRadarRight(360*scanDirection);
 	}
 	
-    /**
-     * Moves the robot depending where the enemy is.
-     * If the robot is far away, it will advance at a 20 degree angle, if we're close enough it will circle the enemy.
-     */
-	/*private void doMove() {
-		EnemyBot enemy = enemyHandler.getEnemy();
-		// allow wall avoidance movements to complete
-		if (wallAvoidance > 0) {
-			double centerX = getBattleFieldWidth()/2;
-			double centerY = getBattleFieldHeight()/2;
-	    	// get the heading
-			double heading = getHeadingToObject(centerX, centerY);
-			doTurnRightRadians(heading);
-			setAhead(100 * robotDirection);
-			wallAvoidance--;
-    	} else {
-
-	    	if (Math.random() > 0.99) {
-	    		travelDirection *= -1;
-	    	} 
-    		
-			//approach enemy if we're too far away
-			double approachAngle = enemy.getDistance() > enemyProximity ? (40 * travelDirection) : (-10 * travelDirection);
-			
-			doTurnRightDegrees(enemy.getBearing() + 90 - approachAngle);
-	    	
-	    	setAhead(100 * travelDirection * robotDirection);
-    	}
-		
-	}*/
-	
 	@Override
 	public void onHitRobot(HitRobotEvent e) {
 		
@@ -229,7 +198,6 @@ public class JaysRobot extends AdvancedRobot {
 
 	@Override
 	public void onDeath(DeathEvent event) {
-		// TODO Auto-generated method stub
 		super.onDeath(event);
 		this.enemyHandler.clearBullets();
 	}
@@ -282,9 +250,15 @@ public class JaysRobot extends AdvancedRobot {
 	    double angle = Calc.getHeadingToObject(this.getX(), this.getY(), dX, dY);
 	    this.turnTo(angle);
 	    if (distance < 10) distance = 10;
-	    this.setAhead(distance * robotDirection);
+	    this.setAhead(distance);
 	}
 
+	@Override
+	public void setAhead(double distance) {
+		distance *= robotDirection;
+		super.setAhead(distance);
+	}
+	
 	/**
 	 * Turns the robot to the angle in the most efficient direction, and reverses the orientation of the robot if going backwards is faster 
 	 * @param angle The angle in radians that you wish to turn to

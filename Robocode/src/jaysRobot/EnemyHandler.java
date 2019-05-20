@@ -2,6 +2,7 @@ package jaysRobot;
 
 import java.util.ArrayList;
 
+import movement.Bullet;
 import robocode.AdvancedRobot;
 import robocode.RobotDeathEvent;
 import robocode.ScannedRobotEvent;
@@ -67,6 +68,33 @@ public class EnemyHandler {
 				}
 				return;
 			}
+		}
+	}
+	public ArrayList<EnemyBot> getEnemies(){
+		return EnemyHandler.enemies;
+	}
+	public void bulletEvent(robocode.Bullet bullet) {
+		String victim = bullet.getVictim();
+		if (victim != null) {
+			for (EnemyBot enemy : EnemyHandler.enemies) {
+				if (enemy.getName().equals(victim)) {
+					enemy.hitBy(bullet);
+				}
+			}
+		}
+	}
+	public ArrayList<Bullet> getBullets(){
+		ArrayList<Bullet> bullets = new ArrayList<Bullet>();
+		for (EnemyBot enemy : this.getEnemies()) {
+			for (Bullet b : enemy.getBullets()) {
+				bullets.add(b);
+			}
+		}
+		return bullets;
+	}
+	public void clearBullets() {
+		for (EnemyBot enemy : EnemyHandler.enemies) {
+			enemy.clearBullets();
 		}
 	}
 }

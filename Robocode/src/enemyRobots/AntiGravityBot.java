@@ -9,15 +9,15 @@ import java.util.*;
  * Conventions in this bot include: Use of radians throughout
  * Storing absolute positions of enemy bots rather than relative ones
  * Very little code in events
- * These are all good programming practices for robocode
- * There may also be methods that arent used; these might just be useful for you.
+ * These are all good programming practices for Robocode
+ * There may also be methods that aren't used; these might just be useful for you.
  */
 public class AntiGravityBot extends AdvancedRobot
 {
 	/**
-	 * run: SnippetBot's default behavior
+	 * run: SnippetBot's default behaviour
 	 */
-	Hashtable targets;				//all enemies are stored in the hashtable
+	Hashtable<String, Enemy> targets;				//all enemies are stored in the Hashtable
 	Enemy target;					//our current enemy
 	final double PI = Math.PI;		//just a constant
 	int direction = 1;				//direction we are heading... 1 = forward, -1 = backwards
@@ -25,11 +25,11 @@ public class AntiGravityBot extends AdvancedRobot
 	double midpointstrength = 0;	//The strength of the gravity point in the middle of the field
 	int midpointcount = 0;			//Number of turns since that strength was changed.
 	public void run() {
-		targets = new Hashtable();
+		targets = new Hashtable<String, Enemy>();
 		target = new Enemy();
 		target.distance = 100000;						//initialise the distance so that we can select a target
 		setColors(Color.red,Color.blue,Color.green);	//sets the colours of the robot
-		//the next two lines mean that the turns of the robot, gun and radar are independant
+		//the next two lines mean that the turns of the robot, gun and radar are independent
 		setAdjustGunForRobotTurn(true);
 		setAdjustRadarForGunTurn(true);
 		turnRadarRightRadians(2*PI);					//turns the radar right around to get a view of the field
@@ -58,7 +58,7 @@ public class AntiGravityBot extends AdvancedRobot
 	    double ang;
 	    GravPoint p;
 		Enemy en;
-    	Enumeration e = targets.elements();
+    	Enumeration<Enemy> e = targets.elements();
 	    //cycle through all the enemies.  If they are alive, they are repulsive.  Calculate the force on us
 		while (e.hasMoreElements()) {
     	    en = (Enemy)e.nextElement();

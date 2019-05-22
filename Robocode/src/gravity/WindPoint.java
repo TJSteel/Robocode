@@ -3,7 +3,7 @@ package gravity;
 import java.awt.geom.Point2D;
 
 /**Holds the x, y, and strength info of a gravity point**/
-public class WindPoint implements GravityPoint {
+public class WindPoint implements ForcePoint {
 	private double x;
 	private double y;
 	private double strength;

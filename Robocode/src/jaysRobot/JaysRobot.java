@@ -3,6 +3,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 
+import enemyRobots.Position;
 import movement.Bullet;
 import movement.MovementHandler;
 import robocode.AdvancedRobot;
@@ -24,7 +25,6 @@ public class JaysRobot extends AdvancedRobot {
 	private byte scanDirection = 1;
 	private int robotDirection = 1;
 	private static double WALL_MARGIN = 100;
-	
 	private EnemyHandler enemyHandler = new EnemyHandler();
 	private MovementHandler movement = new MovementHandler(this, enemyHandler);
 	
@@ -63,10 +63,10 @@ public class JaysRobot extends AdvancedRobot {
 		    g.setColor(new Color(0xff, 0x00, 0x00, 0x80));
 		 
 		    // Draw a line from our robot to the scanned robot
-		    g.drawLine((int)getX(), (int)getY(), enemy.getX(), enemy.getY());
+		    g.drawLine((int)getX(), (int)getY(), (int)enemy.getPosition().getX(), (int)enemy.getPosition().getY());
 		 
 		    // Draw a filled square on top of the scanned robot that covers it
-		    g.fillRect(enemy.getX() - 20,  enemy.getY() - 20, 40, 40);
+		    g.fillRect((int)enemy.getPosition().getX() - 20,  (int)enemy.getPosition().getY() - 20, 40, 40);
 		}
 		for (Bullet b : enemyHandler.getBullets()) {
 			g.drawOval((int)b.getX(time)-25, (int)b.getY(time)-25, 50, 50);
@@ -111,6 +111,42 @@ public class JaysRobot extends AdvancedRobot {
 	}
 
 	private void doScan() {
+		// get the bearing of all enemies, if the lowest bearing in our current scan arc is more than a half turn, switch direction
+		// we want to allow the robot to scan everyone at the start of a round so we will only check this after a cooldown period has elapsed
+		
+		if (this.getTime() < 10) {
+			scanDirection = 1;
+		} else {
+		
+			// Initialise values to a full turn
+			double minNegative = -(Math.PI * 2);
+			double minPositive = (Math.PI * 2);
+			double radarHeading = this.getRadarHeadingRadians();
+			double x = this.getX();
+			double y = this.getY();
+			
+			for (EnemyBot enemy : enemyHandler.getEnemies()) {
+				if (enemy.isAlive()) {
+					Position enemyPosition = enemy.getPosition();
+					double headingToEnemy = Calc.getHeadingToObject(x, y, enemyPosition.getX(), enemyPosition.getY());
+					headingToEnemy -= radarHeading;
+					headingToEnemy = Utils.normalRelativeAngle(headingToEnemy);
+					
+					if (headingToEnemy < 0) {
+						// using greater than minNegative because what we really want is the closest to 0, using less than would give us the largest rotation.
+						if (headingToEnemy > minNegative) minNegative = headingToEnemy;
+					} else {
+						if (headingToEnemy < minPositive) minPositive = headingToEnemy;
+					}
+				}
+			}
+	
+			if (scanDirection == -1) {
+				if (minNegative < -Math.PI) scanDirection = 1;
+			} else {
+				if (minPositive > Math.PI) scanDirection = -1;
+			}
+		}
 		setTurnRadarRight(360*scanDirection);
 	}
 	
@@ -132,15 +168,18 @@ public class JaysRobot extends AdvancedRobot {
     	// aim gun at the enemy
     	double myX = getX();
     	double myY = getY();
-    	double distance = enemy.getDistance();
+    	Position enemyPosition = enemy.getPosition();
+    	Position enemyLastPosition = enemy.getLastPosition();
+    	
+    	double enemyX = enemyPosition.getX();
+    	double enemyY = enemyPosition.getY();
+    	double distance = enemyPosition.getDistance(this.getX(), this.getY());
+    	double enemyHeading = enemyPosition.getHeading();
+    	double oldEnemyHeading = enemyLastPosition.getHeading();
+    	double enemyHeadingChange = enemyHeading - oldEnemyHeading;
+    	double enemyVelocity = enemyPosition.getVelocity();
     	double firePower = getFirePower(distance);
     	double bulletSpeed = Calc.getBulletSpeed(firePower);
-    	double enemyX = enemy.getX();
-    	double enemyY = enemy.getY();
-    	double enemyHeading = enemy.getHeadingRadians();
-    	double oldEnemyHeading = enemy.getPreviousHeadingRadians();
-    	double enemyHeadingChange = enemyHeading - oldEnemyHeading;
-    	double enemyVelocity = enemy.getVelocity();
 
     	double deltaTime = 0;
     	double battleFieldHeight = getBattleFieldHeight(), 

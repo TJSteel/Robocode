@@ -6,7 +6,7 @@ import jaysRobot.Calc;
 import robocode.util.Utils;
 
 /**Holds the x, y, and strength info of a gravity point**/
-public class PerpendicularPoint implements GravityPoint {
+public class PerpendicularPoint implements ForcePoint {
 	private double x;
 	private double y;
 	private double strength;

@@ -3,8 +3,9 @@ package movement;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 
-import gravity.ForcePoint;
+import enemyRobots.Position;
 import gravity.GravityPoint;
+import gravity.ForcePoint;
 import gravity.PerpendicularPoint;
 import gravity.WindPoint;
 import jaysRobot.EnemyBot;
@@ -45,22 +46,24 @@ public class AntiGravity implements Movement {
 		double battlefieldHeight = robot.getBattleFieldHeight();
    		double xForce = 0;
 	    double yForce = 0;
-	    ArrayList<GravityPoint> gravityPoints = new ArrayList<GravityPoint>();
+	    ArrayList<ForcePoint> gravityPoints = new ArrayList<ForcePoint>();
 		ArrayList<EnemyBot> enemies = enemyHandler.getEnemies();
 
 		//cycle through all the enemies. If they are alive, add gravity points
 		for (EnemyBot enemy : enemies) {
 			if (enemy.isAlive()) {
-				gravityPoints.add(new ForcePoint(enemy.getX(),enemy.getY(), this.enemyGravity, this.enemyMultiplier));
-				gravityPoints.add(new PerpendicularPoint(enemy.getX(),enemy.getY(), this.enemyGravity, this.enemyMultiplier, enemy.getHeading()));
+				Position enemyPosition = enemy.getPosition();
+				gravityPoints.add(new GravityPoint(enemyPosition.getX(),enemyPosition.getY(), this.enemyGravity, this.enemyMultiplier));
+				gravityPoints.add(new PerpendicularPoint(enemyPosition.getX(),enemyPosition.getY(), this.enemyGravity, this.enemyMultiplier, enemyPosition.getHeading()));
 			}
 	    }
 		
 		// check distance to target enemy, if too far away, set attraction point
 		target = enemyHandler.getEnemy();
-		if (target.getDistance() > 1000) {
-			gravityPoints.add(new ForcePoint(target.getX(), target.getY(), -this.enemyGravity, 1));
-			gravityPoints.add(new PerpendicularPoint(target.getX(),target.getY(), this.enemyGravity, this.enemyMultiplier, target.getHeading()));
+		Position targetPosition = target.getPosition();
+		if (target.getPosition().getDistance(robot.getX(), robot.getY()) > 1000) {
+			gravityPoints.add(new GravityPoint(targetPosition.getX(), targetPosition.getY(), -this.enemyGravity, 1));
+			gravityPoints.add(new PerpendicularPoint(targetPosition.getX(),targetPosition.getY(), this.enemyGravity, this.enemyMultiplier, targetPosition.getHeading()));
 		}
 		
 		for (Bullet bullet : enemyHandler.getBullets()) {
@@ -81,7 +84,7 @@ public class AntiGravity implements Movement {
 		}
 		
 		// add point in center of map to push
-		gravityPoints.add(new ForcePoint(battlefieldWidth/2, battlefieldHeight/2, this.midPointStrength, this.midPointMultiplier));
+		gravityPoints.add(new GravityPoint(battlefieldWidth/2, battlefieldHeight/2, this.midPointStrength, this.midPointMultiplier));
 
 		// add points for the walls
 		// Top Wall
@@ -102,10 +105,10 @@ public class AntiGravity implements Movement {
 		gravityPoints.add(new WindPoint(0, battlefieldHeight, this.wallGravity, this.wallMultiplier, (Math.PI/4)*3));
 		
 		updateRandomPoint();
-		gravityPoints.add(new ForcePoint(this.randomPointX, this.randomPointY, this.randomPointStrength, 1));
+		gravityPoints.add(new GravityPoint(this.randomPointX, this.randomPointY, this.randomPointStrength, 1));
 		
 		
-		for (GravityPoint gp : gravityPoints) {
+		for (ForcePoint gp : gravityPoints) {
 			Point2D force = gp.getForce(x, y); 
 			xForce += force.getX();
 			yForce += force.getY();

@@ -1,5 +1,8 @@
 package movement;
 
+import java.awt.geom.Point2D;
+
+import enemyRobots.Position;
 import jaysRobot.Calc;
 import jaysRobot.EnemyBot;
 import jaysRobot.EnemyHandler;
@@ -29,8 +32,13 @@ public class CircleEnemy implements Movement {
 			} 
 
 			//approach enemy if we're too far away, otherwise increase our distance
-			double approachAngle = enemy.getDistance() > this.ENEMY_PROXIMITY ? ((Math.PI/180)*40) : -((Math.PI/180)*10);
-			double heading = Calc.getHeadingToObject(robot.getX(), robot.getY(), enemy.getX(), enemy.getY());
+			Position enemyPosition = enemy.getPosition();
+			double enemyX = enemyPosition.getX();
+			double enemyY = enemyPosition.getY();
+			double distance = Point2D.distance(enemyX, enemyY, robot.getX(), robot.getY());
+			
+			double approachAngle = distance > this.ENEMY_PROXIMITY ? ((Math.PI/180)*40) : -((Math.PI/180)*10);
+			double heading = Calc.getHeadingToObject(robot.getX(), robot.getY(), enemyX, enemyY);
 			robot.turnTo(heading - (Math.PI/2) + (approachAngle * travelDirection));
 
 			robot.setAhead(100 * travelDirection);
@@ -49,7 +57,7 @@ public class CircleEnemy implements Movement {
 					|| y < WALL_PROXIMITY
 					|| x > battleFieldWidth - WALL_PROXIMITY
 					|| y > battleFieldHeight - WALL_PROXIMITY) {
-				this.wallAvoidance = WALL_PROXIMITY;
+				this.wallAvoidance = WALL_PROXIMITY / 2;
 				return true;
 			}
 		}

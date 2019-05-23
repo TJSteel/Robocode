@@ -2,11 +2,11 @@ package movement;
 
 import java.awt.geom.Point2D;
 
-import enemyRobots.Position;
 import jaysRobot.Calc;
 import jaysRobot.EnemyBot;
 import jaysRobot.EnemyHandler;
 import jaysRobot.JaysRobot;
+import jaysRobot.Position;
 
 public class CircleEnemy implements Movement {
 	private double wallAvoidance = 0;

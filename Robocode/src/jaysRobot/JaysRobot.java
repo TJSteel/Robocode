@@ -3,7 +3,6 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 
-import enemyRobots.Position;
 import movement.Bullet;
 import movement.MovementHandler;
 import robocode.AdvancedRobot;

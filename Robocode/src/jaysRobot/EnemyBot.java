@@ -3,7 +3,6 @@ package jaysRobot;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 
-import enemyRobots.Position;
 import movement.Bullet;
 import robocode.AdvancedRobot;
 import robocode.RobotDeathEvent;

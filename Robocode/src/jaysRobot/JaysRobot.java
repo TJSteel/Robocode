@@ -5,6 +5,7 @@ import java.awt.geom.Point2D;
 
 import movement.Bullet;
 import movement.MovementHandler;
+import movement.Position;
 import robocode.AdvancedRobot;
 import robocode.BulletHitBulletEvent;
 import robocode.Condition;

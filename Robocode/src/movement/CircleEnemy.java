@@ -6,7 +6,6 @@ import jaysRobot.Calc;
 import jaysRobot.EnemyBot;
 import jaysRobot.EnemyHandler;
 import jaysRobot.JaysRobot;
-import jaysRobot.Position;
 
 public class CircleEnemy implements Movement {
 	private double wallAvoidance = 0;

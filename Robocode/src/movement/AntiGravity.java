@@ -10,7 +10,6 @@ import gravity.WindPoint;
 import jaysRobot.EnemyBot;
 import jaysRobot.EnemyHandler;
 import jaysRobot.JaysRobot;
-import jaysRobot.Position;
 
 public class AntiGravity implements Movement {
 	private double midPointStrength = -1000;		//The strength of the gravity point in the middle of the field

@@ -8,7 +8,6 @@ import movement.Bullet;
 import robocode.AdvancedRobot;
 import robocode.RobotDeathEvent;
 import robocode.ScannedRobotEvent;
-import robocode.util.Utils;
 
 public class EnemyBot {
 
@@ -38,6 +37,8 @@ public class EnemyBot {
 		this.alive = true;
 		this.turnRate = (this.getPosition().getHeading() - this.getLastPosition().getHeading()) / (this.getPosition().getUpdateTime() - this.getLastPosition().getUpdateTime());
 		this.checkEnergyDrop(r);
+		
+		
 	}
 	private void checkEnergyDrop(AdvancedRobot r) {
 		double lastEnergy = this.getLastPosition().getEnergy();
@@ -61,27 +62,82 @@ public class EnemyBot {
 		return this.turnRate;
 	}
 	
-	public Point2D getPredictedLocation(long time) {
-    	// aim gun at the enemy
-		Position position = this.getPosition();
+	public Position getPredictedPosition(double futureTime) {
 		Position lastPosition = this.getLastPosition();
-		double heading = position.getHeading();
-    	double headingChange = heading - lastPosition.getHeading();
-    	double predictedX = position.getX();
-    	double predictedY = position.getY();
-    	double velocity = position.getVelocity();
-    	double distance = time * velocity;
-    	double turnAngle = headingChange * time; 
-    	
-    	/*
-    	while((++deltaTime) * bulletSpeed < Point2D.Double.distance(myX, myY, predictedX, predictedY)){		
-    		predictedX += Math.sin(heading) * velocity;
-    		predictedY += Math.cos(heading) * velocity;
-    		heading += headingChange;
-    	}
-    	double theta = Utils.normalAbsoluteAngle(Math.atan2(predictedX - getX(), predictedY - getY()));
-    	*/
-		return new Point2D.Double(predictedX, predictedY);
+		Position position = this.getPosition();
+		
+		long time1 = lastPosition.getUpdateTime();
+		double heading1 = lastPosition.getHeading();
+		double x1 = lastPosition.getX();
+		double y1 = lastPosition.getY();
+		
+		long time2 = position.getUpdateTime();
+		double heading2 = position.getHeading();
+		double x2 = position.getX();
+		double y2 = position.getY();
+
+		double timeTravelled = time2 - time1;
+		double futureHeading = heading2;
+		double futureX = 0;
+		double futureY = 0;
+
+		double headingChange = heading2 - heading1;
+
+		if (headingChange == 0) {
+			// linear target
+			double xTravelled = (x2-x1) / timeTravelled;
+			double yTravelled = (y2-y1) / timeTravelled;
+			futureX = x2 + xTravelled * futureTime;
+			futureY = y2 + yTravelled * futureTime;
+		} else {
+			/* 
+			 * circular target, the way this will be calculated will mean we have an isosceles triangle
+			 * the triangle will mark the points between position1, position2, and the center of the circle
+			 * headings of the lines will be as follows
+			 * lineA = position1 heading to position2
+			 * lineB = center heading to position2
+			 * lineC = position1 heading to center
+			 */
+			
+			// we can start by calculating all headings
+			// heading A will be the second heading, minus the difference between heading 2 and 1
+			double lineAHeading = heading2 - (headingChange / 2);
+			// the next 2 lines will be the known headings, plus a quarter turn towards the center of the triangle
+			double lineBHeading = heading2 - (Math.PI / 2);
+			double lineCHeading = heading1 + (Math.PI / 2);
+			
+			// now we know all headings, we can calculate the angles of the triangle
+			double angleA = lineCHeading - lineAHeading;
+			// unused but leaving here in comments for full understanding of how they're all calculated
+			// double angleB = angleA;
+			double angleC = Math.PI - (angleA*2);
+			
+			// now we have angles, we can calculate the lengths of the triangle, simpler because it's an isosceles triangle
+			double lineALength = Point2D.distance(x1, y1, x2, y2);
+			double lineBLength = lineALength*Math.sin(angleA)/Math.sin(angleC);
+			// unused but leaving here in comments for full understanding of how they're all calculated
+			// double lineCLength = lineBLength;
+			
+			// now we have all points of the triangle, we can calculate the point marking the center of the circle
+			double centerX = Calc.getObjectX(x1, lineCHeading, lineBLength);
+			double centerY = Calc.getObjectY(y1, lineCHeading, lineBLength);
+
+			// now that we have the location of the objects center of rotation, we can work out where the object is at any given time in the future
+			// speed we're orbiting the circle in radians per time;
+			double angularVelocity = angleC / timeTravelled;
+			double futureAngleTravelled = (angularVelocity * futureTime);
+			futureHeading = lineBHeading + futureAngleTravelled;
+			futureX = Calc.getObjectX(centerX, futureHeading, lineBLength);
+			futureY = Calc.getObjectY(centerY, futureHeading, lineBLength);
+		}
+		
+		Position futurePosition = new Position();
+		futurePosition.setHeading(futureHeading);
+		futurePosition.setUpdateTime((long)futureTime);
+		futurePosition.setX(futureX);
+		futurePosition.setY(futureY);
+		
+		return futurePosition;
 	}
 	
 	/**

@@ -57,4 +57,22 @@ public class Calc {
 		return (y + Math.cos(angle) * distance);
 	}
 	
+	public static int constrainValue(int value, int min, int max) {
+		if (value < min) {
+			return min;
+		} else if (value > max) {
+			return max;
+		} else {
+			return value;
+		}
+	}
+	public static double constrainValue(double value, double min, double max) {
+		if (value < min) {
+			return min;
+		} else if (value > max) {
+			return max;
+		} else {
+			return value;
+		}
+	}
 }

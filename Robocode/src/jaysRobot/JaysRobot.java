@@ -5,6 +5,7 @@ import java.awt.geom.Point2D;
 
 import movement.Bullet;
 import movement.MovementHandler;
+import movement.Position;
 import robocode.AdvancedRobot;
 import robocode.BulletHitBulletEvent;
 import robocode.Condition;
@@ -24,7 +25,6 @@ public class JaysRobot extends AdvancedRobot {
 	private byte scanDirection = 1;
 	private int robotDirection = 1;
 	private static double WALL_MARGIN = 100;
-	
 	private EnemyHandler enemyHandler = new EnemyHandler();
 	private MovementHandler movement = new MovementHandler(this, enemyHandler);
 	
@@ -58,15 +58,36 @@ public class JaysRobot extends AdvancedRobot {
 		long time = getTime();
 		EnemyBot enemy = enemyHandler.getEnemy();
 		if (!enemy.isIdle(time)) {
+	    	double distance = enemy.getPosition().getDistance(this.getX(), this.getY());
+	    	double firePower = getFirePower(distance);
+	    	double bulletSpeed = Calc.getBulletSpeed(firePower);
+	    	double bulletTravelTime = distance / bulletSpeed;
+			
+			Position enemyPosition = enemy.getPredictedPosition(bulletTravelTime);
+			
+			int myX = (int)getX();
+			int myY = (int)getY();
+			
+			int enemyX = (int)enemyPosition.getX();
+			int enemyY = (int)enemyPosition.getY();
 		    
 		    // Set the paint color to a red half transparent color
 		    g.setColor(new Color(0xff, 0x00, 0x00, 0x80));
 		 
 		    // Draw a line from our robot to the scanned robot
-		    g.drawLine((int)getX(), (int)getY(), enemy.getX(), enemy.getY());
+		    g.drawLine(myX, myY, enemyX, enemyY);
 		 
 		    // Draw a filled square on top of the scanned robot that covers it
-		    g.fillRect(enemy.getX() - 20,  enemy.getY() - 20, 40, 40);
+		    g.fillRect(enemyX - 20,  enemyY - 20, 40, 40);
+		    
+		    // get where I think the enemy is right now
+		    enemyPosition = enemy.getPredictedPosition(0);
+			enemyX = (int)enemyPosition.getX();
+			enemyY = (int)enemyPosition.getY();
+		    // Set the paint color to a blue half transparent color
+		    g.setColor(new Color(0x00, 0x00, 0xff, 0x80));
+		    // Draw a filled square on top of the scanned robot that covers it
+		    g.fillRect(enemyX - 20,  enemyY - 20, 40, 40);
 		}
 		for (Bullet b : enemyHandler.getBullets()) {
 			g.drawOval((int)b.getX(time)-25, (int)b.getY(time)-25, 50, 50);
@@ -111,6 +132,42 @@ public class JaysRobot extends AdvancedRobot {
 	}
 
 	private void doScan() {
+		// get the bearing of all enemies, if the lowest bearing in our current scan arc is more than a half turn, switch direction
+		// we want to allow the robot to scan everyone at the start of a round so we will only check this after a cooldown period has elapsed
+		
+		if (this.getTime() < 10) {
+			scanDirection = 1;
+		} else {
+		
+			// Initialise values to a full turn
+			double minNegative = -(Math.PI * 2);
+			double minPositive = (Math.PI * 2);
+			double radarHeading = this.getRadarHeadingRadians();
+			double x = this.getX();
+			double y = this.getY();
+			
+			for (EnemyBot enemy : enemyHandler.getEnemies()) {
+				if (enemy.isAlive()) {
+					Position enemyPosition = enemy.getPosition();
+					double headingToEnemy = Calc.getHeadingToObject(x, y, enemyPosition.getX(), enemyPosition.getY());
+					headingToEnemy -= radarHeading;
+					headingToEnemy = Utils.normalRelativeAngle(headingToEnemy);
+					
+					if (headingToEnemy < 0) {
+						// using greater than minNegative because what we really want is the closest to 0, using less than would give us the largest rotation.
+						if (headingToEnemy > minNegative) minNegative = headingToEnemy;
+					} else {
+						if (headingToEnemy < minPositive) minPositive = headingToEnemy;
+					}
+				}
+			}
+	
+			if (scanDirection == -1) {
+				if (minNegative < -Math.PI) scanDirection = 1;
+			} else {
+				if (minPositive > Math.PI) scanDirection = -1;
+			}
+		}
 		setTurnRadarRight(360*scanDirection);
 	}
 	
@@ -129,45 +186,53 @@ public class JaysRobot extends AdvancedRobot {
 			// nothing to fire at, therefore return
 			return;
 		}
-    	// aim gun at the enemy
+    	// get predicted position of enemy based on their current distance away from us
     	double myX = getX();
     	double myY = getY();
-    	double distance = enemy.getDistance();
+    	Position enemyPosition = enemy.getPosition();
+    	double distance = enemyPosition.getDistance(myX, myY);
+    	// now we know their distance, we'll work out our firePower, and calculate time taken for the bullet to reach them
     	double firePower = getFirePower(distance);
     	double bulletSpeed = Calc.getBulletSpeed(firePower);
-    	double enemyX = enemy.getX();
-    	double enemyY = enemy.getY();
-    	double enemyHeading = enemy.getHeadingRadians();
-    	double oldEnemyHeading = enemy.getPreviousHeadingRadians();
-    	double enemyHeadingChange = enemyHeading - oldEnemyHeading;
-    	double enemyVelocity = enemy.getVelocity();
-
-    	double deltaTime = 0;
-    	double battleFieldHeight = getBattleFieldHeight(), 
-    	       battleFieldWidth = getBattleFieldWidth();
-    	double predictedX = enemyX, predictedY = enemyY;
-    	while((++deltaTime) * bulletSpeed < Point2D.Double.distance(myX, myY, predictedX, predictedY)){		
-    		predictedX += Math.sin(enemyHeading) * enemyVelocity;
-    		predictedY += Math.cos(enemyHeading) * enemyVelocity;
-    		enemyHeading += enemyHeadingChange;
-    		if(	predictedX < 0
-    			|| predictedY < 0
-    			|| predictedX > battleFieldWidth
-    			|| predictedY > battleFieldHeight){
-    	 
-    			predictedX = Math.min(Math.max(0, predictedX), battleFieldWidth);	
-    			predictedY = Math.min(Math.max(0, predictedY), battleFieldHeight);
-    			if (DEBUG) System.out.println("deltaTime exited in if:" + deltaTime);
-    			break;
-    		}
+    	double bulletTravelTime = distance / bulletSpeed;
+    	// now we can get their predicted location
+    	Position enemyPredictedPosition = enemy.getPredictedPosition(bulletTravelTime);  
+    	double enemyX = enemyPredictedPosition.getX();
+    	double enemyY = enemyPredictedPosition.getY();
+    	
+    	/* due to the fact the target is moving, using the time taken for a bullet to reach their known location doesn't work,
+    	 * this is because the time taken to reach them now may be at a distance of 10, but by the time the bullet get's there,
+    	 * they're actually further away so we should have calculated a further ahead distance, 
+    	 * therefore I will add some extra iterations and re-calculate until the time matches the future distance 
+    	 */
+    	
+    	int maxIterations = 5; // don't want an infinite loop
+    	double oldDistance = distance; // to compare the distances we're checking, no point re-running the loop for the sake of a change of less than 0.1
+    	double distanceDifference = 10;
+    	
+    	while (--maxIterations > 0 && distanceDifference > 0.1) {
+    		
+        	distance = Point2D.distance(myX, myY, enemyX, enemyY);
+        	distanceDifference = oldDistance - distance;
+        	if (distanceDifference < 0) distanceDifference *= -1;
+        	firePower = getFirePower(distance);
+        	bulletSpeed = Calc.getBulletSpeed(firePower);
+        	bulletTravelTime = distance / bulletSpeed;
+        	enemyPredictedPosition = enemy.getPredictedPosition(bulletTravelTime);  
+        	enemyX = enemyPredictedPosition.getX();
+        	enemyY = enemyPredictedPosition.getY();
     	}
-		if (DEBUG) System.out.println("deltaTime exited from loop:" + deltaTime);
-    	double theta = Utils.normalAbsoluteAngle(Math.atan2(predictedX - getX(), predictedY - getY()));
+    	
+    	enemyX = Calc.constrainValue(enemyX, 0, this.getBattleFieldWidth());
+    	enemyY = Calc.constrainValue(enemyY, 0, this.getBattleFieldHeight());
+    	
+    	
+    	double enemyHeading = Calc.getHeadingToObject(myX, myY, enemyX, enemyY);
     	 
-    	setTurnGunRightRadians(Utils.normalRelativeAngle(theta - getGunHeadingRadians()));
+    	setTurnGunRightRadians(Utils.normalRelativeAngle(enemyHeading - getGunHeadingRadians()));
     	
     	// shoot to kill if the gun is aimed and not too hot
-    	if (getGunHeat() <= firePower && Math.abs(getGunTurnRemaining()) < 5) {
+    	if (getGunHeat() <= firePower && Math.abs(getGunTurnRemainingRadians()) < (Math.PI / 36)) {
     		setFire(firePower);
     	}
 	}

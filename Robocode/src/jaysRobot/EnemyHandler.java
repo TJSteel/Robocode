@@ -27,11 +27,11 @@ public class EnemyHandler {
 		if (!enemyFound) addEnemy(e, r);
 		
 		// update the currentTarget
-		EnemyBot closestEnemy = getClosestEnemy();
+		EnemyBot closestEnemy = getClosestEnemy(r);
 		if ((currentTarget == null || currentTarget.isAlive() == false) && closestEnemy != null) {
 			currentTarget = closestEnemy;
 		} else if (closestEnemy != null) {
-			if (closestEnemy.getDistance() < currentTarget.getDistance() - changeTargetMargin) {
+			if (closestEnemy.getPosition().getDistance(r.getX(), r.getY()) < currentTarget.getPosition().getDistance(r.getX(), r.getY()) - changeTargetMargin) {
 				currentTarget = closestEnemy;
 			}
 		} 
@@ -41,14 +41,14 @@ public class EnemyHandler {
 		enemy.update(e, r);
 		EnemyHandler.enemies.add(enemy);
 	}
-	public EnemyBot getClosestEnemy() {
+	public EnemyBot getClosestEnemy(AdvancedRobot r) {
 		int enemyI = -1;
 		
 		for (int i = 0; i < enemies.size(); i++) {
 			// we only want to update if the enemy is alive 
 			if (enemies.get(i).isAlive()) {
 				// if we aren't locked onto a target, or we find a closer target, update
-				if (enemyI == -1 || enemies.get(i).getDistance() < enemies.get(enemyI).getDistance()) {
+				if (enemyI == -1 || enemies.get(i).getPosition().getDistance(r.getX(), r.getY()) < enemies.get(enemyI).getPosition().getDistance(r.getX(), r.getY())) {
 					enemyI = i;
 				}
 			}
@@ -62,10 +62,6 @@ public class EnemyHandler {
 		for (EnemyBot enemy : enemies) {
 			if (e.getName().equals(enemy.getName())) {
 				enemy.death(e);
-				// if current target just died, switch to closest target
-				if (currentTarget.getName().equals(e.getName())) {
-					currentTarget = getClosestEnemy();
-				}
 				return;
 			}
 		}
@@ -75,10 +71,15 @@ public class EnemyHandler {
 	}
 	public void bulletEvent(robocode.Bullet bullet) {
 		String victim = bullet.getVictim();
+		String attacker = bullet.getName();
+		
 		if (victim != null) {
 			for (EnemyBot enemy : EnemyHandler.enemies) {
 				if (enemy.getName().equals(victim)) {
 					enemy.hitBy(bullet);
+				}
+				if (enemy.getName().equals(attacker)) {
+					enemy.hit(bullet);
 				}
 			}
 		}

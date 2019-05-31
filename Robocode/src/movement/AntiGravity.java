@@ -7,104 +7,89 @@ import gravity.GravityPoint;
 import gravity.ForcePoint;
 import gravity.PerpendicularPoint;
 import gravity.WindPoint;
+import jaysRobot.Calc;
 import jaysRobot.EnemyBot;
 import jaysRobot.EnemyHandler;
 import jaysRobot.JaysRobot;
+import robocode.AdvancedRobot;
+import safePoints.SafePoint;
 
 public class AntiGravity implements Movement {
-	private double midPointStrength = -1000;		//The strength of the gravity point in the middle of the field
-	private final double MID_POINT_MULTIPLIER = 1.5;
-	private final int ENEMY_GRAVITY = -10000;
-	private final double ENEMY_MULTIPLIER = 2;
+	private final int ENEMY_GRAVITY = -500;
 	private final int WALL_GRAVITY = -5000;
-	private final double WALL_MULTIPLER = 3;
-	private final double BULLET_GRAVITY = -5000;
-	private final double BULLET_MULTIPLIER = 3;
-	private final double RANDOM_POINT_STRENGTH = 1000;
-	private double randomPointCount = 11; // so that update random will change the value on first run
-	private final double RANDOM_POINT_CHANGE = 100;
-	private double randomPointX = 0;
-	private double randomPointY = 0;
+	private final double BULLET_GRAVITY = -50000;
+	private final double SAFE_POINT_STRENGTH = 5000;
+	private SafePoint safePoint = new SafePoint(0,0,Double.POSITIVE_INFINITY);
 	private EnemyBot target;
 	private double battlefieldWidth = 0;
 	private double battlefieldHeight = 0;
-	private double robotX = 0;
-	private double robotY = 0;
+	private final double SAFE_DISTANCE = 100;
+	private EnemyHandler enemyHandler = new EnemyHandler();
+	private AdvancedRobot robot = new AdvancedRobot();
+	private final double ENEMY_DANGER = 10;
 	
-	public void updateRandomPoint() {
-		randomPointCount ++;
-		if (randomPointCount > RANDOM_POINT_CHANGE) {
-			randomPointCount = 0;
-			/*
-			 * it's called random point, but I'd like a little intelligence to this
-			 * my idea for this is to have us aim near corner / wall,
-			 * by doing this is should prevent being surrounded 
-			 */
-			
-			final double WALL_MARGIN = 100;
-			
-			// start by calculating closest corner
-			// initialise with top left
-			double closestCorner = Point2D.distance(robotX, robotY, 0, battlefieldHeight);
-			randomPointX = 0;
-			randomPointY = battlefieldHeight;
-			
-			// top right
-			if (Point2D.distance(robotX, robotY, battlefieldWidth, battlefieldHeight) < closestCorner) {
-				randomPointX = battlefieldWidth;
-				randomPointY = battlefieldHeight;
+	public void updateSafePoint() {
+		safePoint = new SafePoint(0,0,Double.POSITIVE_INFINITY);
+
+		// I will start by generating a point in each corner and then set it's danger level based on the closeness of each enemy;
+		
+		ArrayList<SafePoint> safePoints = new ArrayList<SafePoint>();
+		
+		safePoints.add(new SafePoint(0 + SAFE_DISTANCE, battlefieldHeight - SAFE_DISTANCE, 0)); // top left corner
+		safePoints.add(new SafePoint(battlefieldWidth - SAFE_DISTANCE, battlefieldHeight - SAFE_DISTANCE, 0)); // top right corner
+		safePoints.add(new SafePoint(0 + SAFE_DISTANCE, 0 + SAFE_DISTANCE, 0)); // bottom left corner
+		safePoints.add(new SafePoint(battlefieldWidth - SAFE_DISTANCE, 0 + SAFE_DISTANCE, 0)); // bottom right corner			
+		
+		// for each safe point, calculate the distance to each enemy and update the danger according to their proximity
+		for (SafePoint p : safePoints) {
+			for (EnemyBot e : this.enemyHandler.getEnemies()) {
+				double danger = 0;
+				double enemyDistance = e.getPosition().getDistance(p.getX(), p.getY());
+				
+				danger = ENEMY_DANGER / enemyDistance;
+				
+				p.setDanger(p.getDanger() + danger);
 			}
-			// bottom left
-			if (Point2D.distance(robotX, robotY, 0, 0) < closestCorner) {
-				randomPointX = 0;
-				randomPointY = 0;
-			}
-			// bottom right
-			if (Point2D.distance(robotX, robotY, battlefieldWidth, 0) < closestCorner) {
-				randomPointX = battlefieldWidth;
-				randomPointY = 0;
-			}
-			
-			/* 
-			 * now we have picked the closest corner to attract to, we will add some distance so we don't crash into it, and some random side to side movement
-			 * this may put the robot outside the barrier, so we'll correct this later
-			 */
-			randomPointX += WALL_MARGIN;
-			randomPointY += WALL_MARGIN;
-			
-			// now we add a random amount to each point
-			randomPointX += (Math.random() * (WALL_MARGIN * 2));
-			randomPointY += (Math.random() * (WALL_MARGIN * 2));
+			if (p.getDanger() < safePoint.getDanger()) safePoint = p;
 		}
+		System.out.println("Safe point is at " + safePoint.getX() + ", " + safePoint.getY());
+		// move the point back inside the map and away from the wall
+		safePoint.setX(Calc.constrainValue(safePoint.getX(), 0 + SAFE_DISTANCE, battlefieldWidth - SAFE_DISTANCE));
+		safePoint.setY(Calc.constrainValue(safePoint.getY(), 0 + SAFE_DISTANCE, battlefieldHeight - SAFE_DISTANCE));
 	}
 	
 	public void move(JaysRobot robot, EnemyHandler enemyHandler) {
-		robotX = robot.getX();
-		robotY = robot.getY();
+		// update global variables so that other functions have access to this
+		this.robot = robot;
+		this.enemyHandler = enemyHandler;
+		double robotX = robot.getX();
+		double robotY = robot.getY();
 		long time = robot.getTime();
 		battlefieldWidth = robot.getBattleFieldWidth();
 		battlefieldHeight = robot.getBattleFieldHeight();
    		double xForce = 0;
 	    double yForce = 0;
-	    ArrayList<ForcePoint> gravityPoints = new ArrayList<ForcePoint>();
+	    ArrayList<ForcePoint> forcePoints = new ArrayList<ForcePoint>();
 		ArrayList<EnemyBot> enemies = enemyHandler.getEnemies();
+
+		// get the target robot
+		target = enemyHandler.getEnemy();
 
 		//cycle through all the enemies. If they are alive, add gravity points
 		for (EnemyBot enemy : enemies) {
 			if (enemy.isAlive()) {
-				Position enemyPosition = enemy.getPosition();
-				gravityPoints.add(new GravityPoint(enemyPosition.getX(),enemyPosition.getY(), this.ENEMY_GRAVITY, this.ENEMY_MULTIPLIER));
-				gravityPoints.add(new PerpendicularPoint(enemyPosition.getX(),enemyPosition.getY(), this.ENEMY_GRAVITY, this.ENEMY_MULTIPLIER, enemyPosition.getHeading()));
+				if (enemy.getName().equals(target.getName()) == false){
+					Position enemyPosition = enemy.getPosition();
+					forcePoints.add(new GravityPoint(enemyPosition.getX(),enemyPosition.getY(), this.ENEMY_GRAVITY, 0));
+					//forcePoints.add(new PerpendicularPoint(enemyPosition.getX(),enemyPosition.getY(), this.ENEMY_GRAVITY, enemyPosition.getHeading()));
+				}
 			}
 	    }
 		
-		// check distance to target enemy, if too far away, set attraction point
-		target = enemyHandler.getEnemy();
+		// setup force points for the target
 		Position targetPosition = target.getPosition();
-		if (target.getPosition().getDistance(robot.getX(), robot.getY()) > 1000) {
-			gravityPoints.add(new GravityPoint(targetPosition.getX(), targetPosition.getY(), -this.ENEMY_GRAVITY, 1));
-			gravityPoints.add(new PerpendicularPoint(targetPosition.getX(),targetPosition.getY(), this.ENEMY_GRAVITY, this.ENEMY_MULTIPLIER, targetPosition.getHeading()));
-		}
+		//forcePoints.add(new GravityPoint(targetPosition.getX(), targetPosition.getY(), -this.ENEMY_GRAVITY, SAFE_DISTANCE*5));
+		forcePoints.add(new PerpendicularPoint(targetPosition.getX(),targetPosition.getY(), this.ENEMY_GRAVITY, targetPosition.getHeading()));
 		
 		for (Bullet bullet : enemyHandler.getBullets()) {
 			if (bullet.isActive(time)) {
@@ -116,40 +101,37 @@ public class AntiGravity implements Movement {
 				timeWhenHit += time; 
 				
 				// where it is now
-				gravityPoints.add(new PerpendicularPoint(bullet.getX(time), bullet.getY(time), this.BULLET_GRAVITY, this.BULLET_MULTIPLIER, bullet.getHeading()));
+				//forcePoints.add(new PerpendicularPoint(bullet.getX(time), bullet.getY(time), this.BULLET_GRAVITY, bullet.getHeading()));
 				
 				// where it will hit
-				gravityPoints.add(new PerpendicularPoint(bullet.getX(timeWhenHit), bullet.getY(timeWhenHit), this.BULLET_GRAVITY, this.BULLET_MULTIPLIER, bullet.getHeading()));
+				//forcePoints.add(new PerpendicularPoint(bullet.getX(timeWhenHit), bullet.getY(timeWhenHit), this.BULLET_GRAVITY, bullet.getHeading()));
 			}
 		}
-		
-		// add point in center of map to push
-		gravityPoints.add(new GravityPoint(battlefieldWidth/2, battlefieldHeight/2, this.midPointStrength, this.MID_POINT_MULTIPLIER));
-
+		/*
 		// add points for the walls
 		// Top Wall
-		gravityPoints.add(new WindPoint(battlefieldWidth/2, battlefieldHeight, this.WALL_GRAVITY, this.WALL_MULTIPLER, Math.PI));
+		forcePoints.add(new WindPoint(battlefieldWidth/2, battlefieldHeight, this.WALL_GRAVITY, Math.PI));
 		// Top Right Wall
-		gravityPoints.add(new WindPoint(battlefieldWidth, battlefieldHeight, this.WALL_GRAVITY, this.WALL_MULTIPLER, (Math.PI/4)*5));
+		forcePoints.add(new WindPoint(battlefieldWidth, battlefieldHeight, this.WALL_GRAVITY, (Math.PI/4)*5));
 		// Right Wall
-		gravityPoints.add(new WindPoint(battlefieldWidth, battlefieldHeight/2, this.WALL_GRAVITY, this.WALL_MULTIPLER, (Math.PI/2)*3));
+		forcePoints.add(new WindPoint(battlefieldWidth, battlefieldHeight/2, this.WALL_GRAVITY, (Math.PI/2)*3));
 		// Bottom Right Wall
-		gravityPoints.add(new WindPoint(battlefieldWidth, 0, this.WALL_GRAVITY, this.WALL_MULTIPLER, (Math.PI/4)*7));
+		forcePoints.add(new WindPoint(battlefieldWidth, 0, this.WALL_GRAVITY, (Math.PI/4)*7));
 		// Bottom Wall
-		gravityPoints.add(new WindPoint(battlefieldWidth/2, 0, this.WALL_GRAVITY, this.WALL_MULTIPLER, 0));
+		forcePoints.add(new WindPoint(battlefieldWidth/2, 0, this.WALL_GRAVITY, 0));
 		// Left Bottom Wall
-		gravityPoints.add(new WindPoint(0, 0, this.WALL_GRAVITY, this.WALL_MULTIPLER, Math.PI/4));
+		forcePoints.add(new WindPoint(0, 0, this.WALL_GRAVITY, Math.PI/4));
 		// Left Wall
-		gravityPoints.add(new WindPoint(0, battlefieldHeight/2, this.WALL_GRAVITY, this.WALL_MULTIPLER, Math.PI/2));
+		forcePoints.add(new WindPoint(0, battlefieldHeight/2, this.WALL_GRAVITY, Math.PI/2));
 		// Top Left Wall
-		gravityPoints.add(new WindPoint(0, battlefieldHeight, this.WALL_GRAVITY, this.WALL_MULTIPLER, (Math.PI/4)*3));
+		forcePoints.add(new WindPoint(0, battlefieldHeight, this.WALL_GRAVITY, (Math.PI/4)*3));
+		*/
+		updateSafePoint();
+		//forcePoints.add(new GravityPoint(this.safePoint.getX(), this.safePoint.getY(), this.SAFE_POINT_STRENGTH, SAFE_DISTANCE*2));
 		
-		updateRandomPoint();
-		gravityPoints.add(new GravityPoint(this.randomPointX, this.randomPointY, this.RANDOM_POINT_STRENGTH, 1));
 		
-		
-		for (ForcePoint gp : gravityPoints) {
-			Point2D force = gp.getForce(robotX, robotY); 
+		for (ForcePoint fp : forcePoints) {
+			Point2D force = fp.getForce(robotX, robotY); 
 			xForce += force.getX();
 			yForce += force.getY();
 		}

@@ -19,7 +19,7 @@ public class MovementHandler
 	}
 
 	public void move() {
-		if (this.robot.getOthers() > 3) {
+		if (this.robot.getOthers() > 0) {
 			antiGravity.move(this.robot, this.enemyHandler);
 		} else {
 			circleEnemy.move(this.robot, this.enemyHandler);

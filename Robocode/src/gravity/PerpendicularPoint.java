@@ -10,14 +10,12 @@ public class PerpendicularPoint implements ForcePoint {
 	private double x;
 	private double y;
 	private double strength;
-	private double multiplier;
 	private double heading;
     
-    public PerpendicularPoint(double x, double y, double strength, double multiplier, double heading) {
+    public PerpendicularPoint(double x, double y, double strength, double heading) {
         this.x = x;
         this.y = y;
         this.strength = strength;
-        this.multiplier = multiplier;
         this.heading = heading;
     }
 	public double getX() {
@@ -44,7 +42,7 @@ public class PerpendicularPoint implements ForcePoint {
 	    	heading -= Math.PI / 2;
 	    }
 	    Utils.normalRelativeAngle(heading);
-        force = this.strength/Math.pow(Point2D.distance(x, y, this.getX(), this.getY()), this.multiplier);
+        force = this.strength/Point2D.distance(x, y, this.getX(), this.getY());
         //Find the bearing from the point to us
         xForce = Math.sin(heading) * force;
         yForce = Math.cos(heading) * force;
